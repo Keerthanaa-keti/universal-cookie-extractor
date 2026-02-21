@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cookie Explorer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            mono: ['SF Mono', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+          },
+          animation: {
+            'fade-in': 'fadeIn 0.3s ease-out',
+            'slide-down': 'slideDown 0.25s ease-out',
+            'pulse-soft': 'pulseSoft 2s infinite',
+          },
+          keyframes: {
+            fadeIn: { '0%': { opacity: '0', transform: 'translateY(-4px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+            slideDown: { '0%': { opacity: '0', maxHeight: '0' }, '100%': { opacity: '1', maxHeight: '2000px' } },
+            pulseSoft: { '0%, 100%': { opacity: '1' }, '50%': { opacity: '0.7' } },
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { scrollbar-width: thin; scrollbar-color: #3f3f46 transparent; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #52525b; }
+
+    .cookie-row:hover { background: rgba(63, 63, 70, 0.3); }
+    .domain-row { transition: background 0.15s ease; }
+    .domain-row:hover { background: rgba(63, 63, 70, 0.4); }
+
+    .badge { @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium; }
+
+    .expand-icon { transition: transform 0.2s ease; }
+    .expanded .expand-icon { transform: rotate(90deg); }
+
+    .category-tab { transition: all 0.15s ease; }
+    .category-tab.active { border-color: #a1a1aa; color: #fafafa; background: rgba(63, 63, 70, 0.5); }
+
+    .stat-card { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+    .stat-card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+
+    .learn-more-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease, opacity 0.3s ease; opacity: 0; }
+    .learn-more-content.open { max-height: 500px; opacity: 1; }
+
+    @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+    .shimmer { background: linear-gradient(90deg, #27272a 25%, #3f3f46 50%, #27272a 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-50 min-h-screen">
+
+  <!-- Main App Container -->
+  <div id="app" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+    <!-- Header -->
+    <header class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-lg">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="8" cy="9" r="1.5" fill="currentColor"/><circle cx="15" cy="8" r="1" fill="currentColor"/><circle cx="10" cy="14" r="1.2" fill="currentColor"/><circle cx="15.5" cy="13" r="0.8" fill="currentColor"/></svg>
+        </div>
+        <div>
+          <h1 class="text-xl font-semibold tracking-tight">Cookie Explorer</h1>
+          <p class="text-sm text-zinc-500">Inspect, search, and understand your browser cookies</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="btn-refresh" onclick="refreshData()" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-zinc-700 bg-zinc-900 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 transition-colors">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          Refresh
+        </button>
+        <button onclick="copyAllAsJSON()" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-zinc-700 bg-zinc-900 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 transition-colors">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+          Copy JSON
+        </button>
+      </div>
+    </header>
+
+    <!-- No Data State -->
+    <div id="no-data-state" class="hidden">
+      <div class="border border-zinc-800 rounded-lg p-8 text-center max-w-2xl mx-auto mt-12">
+        <div class="w-16 h-16 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4">
+          <svg class="w-8 h-8 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+        </div>
+        <h2 class="text-lg font-medium text-zinc-200 mb-2">No Cookie Data Found</h2>
+        <p class="text-sm text-zinc-500 mb-6 max-w-md mx-auto">
+          The Cookie Extractor extension hasn't injected data into this page yet. Make sure the extension is installed and this page is served via HTTP (not opened as a file).
+        </p>
+        <div class="text-left">
+          <label class="block text-sm font-medium text-zinc-400 mb-2">Paste cookie JSON data manually:</label>
+          <textarea id="manual-json-input" class="w-full h-40 bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-sm font-mono text-zinc-300 placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-600 focus:border-zinc-600 resize-none" placeholder='{"timestamp":"...","totalCookies":100,"domainCount":10,"domains":[...],"cookiesByDomain":{...}}'></textarea>
+          <button onclick="loadManualJSON()" class="mt-3 px-4 py-2 rounded-md bg-zinc-100 text-zinc-900 text-sm font-medium hover:bg-zinc-200 transition-colors">
+            Load Data
+          </button>
+          <p id="manual-json-error" class="mt-2 text-sm text-red-400 hidden"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dashboard Content (hidden until data loads) -->
+    <div id="dashboard" class="hidden">
+
+      <!-- Stats Bar -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        <div class="stat-card border border-zinc-800 rounded-lg p-4 bg-zinc-900/50">
+          <p class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">Total Cookies</p>
+          <p id="stat-total" class="text-2xl font-semibold text-zinc-100 tabular-nums">0</p>
+        </div>
+        <div class="stat-card border border-zinc-800 rounded-lg p-4 bg-zinc-900/50">
+          <p class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">Domains</p>
+          <p id="stat-domains" class="text-2xl font-semibold text-zinc-100 tabular-nums">0</p>
+        </div>
+        <div class="stat-card border border-zinc-800 rounded-lg p-4 bg-zinc-900/50">
+          <p class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">Last Updated</p>
+          <p id="stat-updated" class="text-lg font-medium text-zinc-100">--</p>
+        </div>
+        <div class="stat-card border border-zinc-800 rounded-lg p-4 bg-zinc-900/50">
+          <p class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">Categories</p>
+          <div id="stat-categories" class="flex flex-wrap gap-1.5 mt-1"></div>
+        </div>
+      </div>
+
+      <!-- Search Bar -->
+      <div class="relative mb-6">
+        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <input id="search-input" type="text" placeholder="Search domains or cookie names..." class="w-full bg-zinc-900 border border-zinc-800 rounded-lg pl-10 pr-10 py-2.5 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-zinc-600 focus:border-zinc-600" oninput="handleSearch(this.value)">
+        <button id="search-clear" class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 hidden" onclick="clearSearch()">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Category Tabs -->
+      <div class="flex flex-wrap gap-2 mb-6" id="category-tabs"></div>
+
+      <!-- Domain List -->
+      <div id="domain-list" class="space-y-1"></div>
+
+      <!-- Search no results -->
+      <div id="no-results" class="hidden text-center py-12">
+        <p class="text-zinc-500 text-sm">No domains or cookies match your search.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast notification -->
+  <div id="toast" class="fixed bottom-6 right-6 bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-2.5 text-sm text-zinc-200 shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 z-50"></div>
+
+<script>
+// ============================================================
+// Cookie Knowledge Base
+// ============================================================
+const COOKIE_KNOWLEDGE = {
+  'li_at': { purpose: 'Main authentication token - keeps you logged in', category: 'auth' },
+  'li_rm': { purpose: 'Remember Me token for persistent login', category: 'auth' },
+  'JSESSIONID': { purpose: 'Server session identifier', category: 'auth' },
+  'bscookie': { purpose: 'Browser security cookie - fraud prevention', category: 'security' },
+  'bcookie': { purpose: 'Browser identifier cookie', category: 'tracking' },
+  'lidc': { purpose: 'Data center routing and load balancing', category: 'infrastructure' },
+  'li_sugr': { purpose: 'User identification for analytics', category: 'tracking' },
+  'li_theme': { purpose: 'Dark/light mode preference', category: 'preference' },
+  'li_theme_set': { purpose: 'How theme was set (manual vs system)', category: 'preference' },
+  'lang': { purpose: 'Language preference', category: 'preference' },
+  'AnalyticsSyncHistory': { purpose: 'Syncs analytics across LinkedIn services', category: 'analytics' },
+  'UserMatchHistory': { purpose: 'Matches profile to ad targeting', category: 'tracking' },
+  'lms_ads': { purpose: 'LinkedIn Marketing Solutions ad tracking', category: 'advertising' },
+  'lms_analytics': { purpose: 'LinkedIn Marketing Solutions analytics', category: 'analytics' },
+  'liap': { purpose: 'LinkedIn app authentication', category: 'auth' },
+  'sdui_ver': { purpose: 'UI version identifier', category: 'preference' },
+  'timezone': { purpose: 'User timezone setting', category: 'preference' },
+  'fid': { purpose: 'Fingerprint identifier', category: 'tracking' },
+  'dfpfpt': { purpose: 'Google Ad Manager (DoubleClick) fingerprint', category: 'advertising' },
+  'SID': { purpose: 'Google session ID - main auth', category: 'auth' },
+  'HSID': { purpose: 'Google security cookie (HTTP)', category: 'auth' },
+  'SSID': { purpose: 'Google security cookie (HTTPS)', category: 'auth' },
+  'APISID': { purpose: 'Google API session ID', category: 'auth' },
+  'SAPISID': { purpose: 'Google secure API session ID', category: 'auth' },
+  'NID': { purpose: 'Google preferences and ad personalization', category: 'preference' },
+  '1P_JAR': { purpose: 'Google ad optimization and tracking', category: 'advertising' },
+  '__Secure-1PSID': { purpose: 'Google secure session (SameSite)', category: 'auth' },
+  '__Secure-3PSID': { purpose: 'Google cross-site session', category: 'auth' },
+  '__Secure-1PSIDTS': { purpose: 'Google secure session timestamp', category: 'auth' },
+  '__Secure-3PSIDTS': { purpose: 'Google cross-site session timestamp', category: 'auth' },
+  '__Secure-1PAPISID': { purpose: 'Google secure API session ID', category: 'auth' },
+  '__Secure-3PAPISID': { purpose: 'Google cross-site API session ID', category: 'auth' },
+  '__Secure-1PSIDCC': { purpose: 'Google secure session consent cookie', category: 'auth' },
+  '__Secure-3PSIDCC': { purpose: 'Google cross-site session consent', category: 'auth' },
+  'CONSENT': { purpose: 'Cookie consent preference', category: 'preference' },
+  'SIDCC': { purpose: 'Google security cookie - connection integrity', category: 'security' },
+  'c_user': { purpose: 'Facebook user ID', category: 'auth' },
+  'xs': { purpose: 'Facebook session token', category: 'auth' },
+  'fr': { purpose: 'Facebook ad targeting', category: 'advertising' },
+  'sb': { purpose: 'Facebook browser identifier', category: 'security' },
+  'datr': { purpose: 'Facebook browser fingerprint (fraud prevention)', category: 'security' },
+  'wd': { purpose: 'Facebook browser window dimensions', category: 'preference' },
+  'presence': { purpose: 'Facebook chat presence status', category: 'functionality' },
+  '__cf_bm': { purpose: 'Cloudflare bot management - distinguishes humans from bots', category: 'security' },
+  'cf_clearance': { purpose: 'Cloudflare challenge clearance token', category: 'security' },
+  '_pxvid': { purpose: 'PerimeterX bot detection visitor ID', category: 'security' },
+  '_px3': { purpose: 'PerimeterX bot detection session', category: 'security' },
+  '_ga': { purpose: 'Google Analytics visitor ID', category: 'analytics' },
+  '_gid': { purpose: 'Google Analytics session ID', category: 'analytics' },
+  '_gat': { purpose: 'Google Analytics rate limiting', category: 'analytics' },
+  '_gat_gtag': { purpose: 'Google Analytics rate limiting (gtag)', category: 'analytics' },
+  '_fbp': { purpose: 'Facebook Pixel tracking', category: 'advertising' },
+  '_fbc': { purpose: 'Facebook click identifier', category: 'advertising' },
+  '_gcl_au': { purpose: 'Google Ads conversion linker', category: 'advertising' },
+  '_gcl_aw': { purpose: 'Google Ads click conversion tracking', category: 'advertising' },
+  'aam_uuid': { purpose: 'Adobe Audience Manager - ad targeting', category: 'advertising' },
+  'mbox': { purpose: 'Adobe Target - A/B testing', category: 'analytics' },
+  'g_state': { purpose: 'Google One Tap login state', category: 'auth' },
+  'ar_debug': { purpose: 'Ad attribution debug mode', category: 'advertising' },
+  'bitmovin_analytics_uuid': { purpose: 'Video player analytics', category: 'analytics' },
+  'IDE': { purpose: 'Google DoubleClick ad serving', category: 'advertising' },
+  'test_cookie': { purpose: 'DoubleClick test cookie support check', category: 'infrastructure' },
+  'PHPSESSID': { purpose: 'PHP server session ID', category: 'auth' },
+  'csrf_token': { purpose: 'Cross-site request forgery protection', category: 'security' },
+  'csrftoken': { purpose: 'Cross-site request forgery protection', category: 'security' },
+  '_csrf': { purpose: 'Cross-site request forgery protection', category: 'security' },
+  'XSRF-TOKEN': { purpose: 'Cross-site request forgery protection token', category: 'security' },
+  'optimizelyEndUserId': { purpose: 'Optimizely A/B testing user ID', category: 'analytics' },
+  'hubspotutk': { purpose: 'HubSpot visitor tracking', category: 'analytics' },
+  '__hstc': { purpose: 'HubSpot main tracking cookie', category: 'analytics' },
+  '__hssc': { purpose: 'HubSpot session tracking', category: 'analytics' },
+  '__hssrc': { purpose: 'HubSpot session reset indicator', category: 'analytics' },
+  'AWSALB': { purpose: 'AWS Application Load Balancer routing', category: 'infrastructure' },
+  'AWSALBCORS': { purpose: 'AWS ALB routing (CORS-enabled)', category: 'infrastructure' },
+  'connect.sid': { purpose: 'Express.js session identifier', category: 'auth' },
+  'ASP.NET_SessionId': { purpose: 'ASP.NET server session identifier', category: 'auth' },
+  '__stripe_mid': { purpose: 'Stripe fraud prevention - machine ID', category: 'security' },
+  '__stripe_sid': { purpose: 'Stripe fraud prevention - session ID', category: 'security' },
+  '_dd_s': { purpose: 'Datadog RUM session tracking', category: 'analytics' },
+  'ajs_anonymous_id': { purpose: 'Segment anonymous visitor ID', category: 'analytics' },
+  'ajs_user_id': { purpose: 'Segment identified user ID', category: 'analytics' },
+  '_uetsid': { purpose: 'Bing Ads UET session tracking', category: 'advertising' },
+  '_uetvid': { purpose: 'Bing Ads UET visitor tracking', category: 'advertising' },
+  'ln_or': { purpose: 'LinkedIn Insight Tag origin tracking', category: 'advertising' },
+  '_pin_unauth': { purpose: 'Pinterest unauthenticated user tracking', category: 'tracking' },
+  '_pinterest_sess': { purpose: 'Pinterest session identifier', category: 'auth' },
+  'VISITOR_INFO1_LIVE': { purpose: 'YouTube visitor identifier', category: 'tracking' },
+  'YSC': { purpose: 'YouTube session cookie', category: 'auth' },
+  'GPS': { purpose: 'YouTube geolocation tracking', category: 'tracking' },
+  'PREF': { purpose: 'YouTube/Google user preferences', category: 'preference' },
+  'LOGIN_INFO': { purpose: 'YouTube login session info', category: 'auth' },
+};
+
+// Prefix-based matching patterns
+const COOKIE_PREFIX_KNOWLEDGE = {
+  'AMCV_': { purpose: 'Adobe Marketing Cloud visitor ID', category: 'analytics' },
+  '_hjid': { purpose: 'Hotjar anonymous user ID', category: 'analytics' },
+  '_hjSession': { purpose: 'Hotjar session data', category: 'analytics' },
+  '_hjAbsoluteSessionInProgress': { purpose: 'Hotjar active session indicator', category: 'analytics' },
+  '_hjIncludedInSessionSample': { purpose: 'Hotjar session sampling flag', category: 'analytics' },
+  'mp_': { purpose: 'Mixpanel analytics', category: 'analytics' },
+  'ajs_': { purpose: 'Segment analytics', category: 'analytics' },
+  'intercom-': { purpose: 'Intercom chat widget', category: 'functionality' },
+  '_pk_': { purpose: 'Matomo/Piwik analytics', category: 'analytics' },
+  '__utm': { purpose: 'Google Analytics classic (Urchin) tracking', category: 'analytics' },
+  'wp-': { purpose: 'WordPress functionality', category: 'functionality' },
+  'wordpress_': { purpose: 'WordPress authentication', category: 'auth' },
+  'twid': { purpose: 'Twitter/X user identifier', category: 'auth' },
+  'guest_id': { purpose: 'Twitter/X guest identifier', category: 'tracking' },
+  'ct0': { purpose: 'Twitter/X CSRF protection token', category: 'security' },
+  '_sp_': { purpose: 'Snowplow analytics', category: 'analytics' },
+  '__cfduid': { purpose: 'Cloudflare user identification (deprecated)', category: 'security' },
+  'OptanonConsent': { purpose: 'OneTrust cookie consent preferences', category: 'preference' },
+  'OptanonAlertBoxClosed': { purpose: 'OneTrust consent banner dismissed', category: 'preference' },
+  'CookieConsent': { purpose: 'Cookie consent preference', category: 'preference' },
+  'euconsent': { purpose: 'IAB EU cookie consent framework', category: 'preference' },
+};
+
+function lookupCookiePurpose(name) {
+  // Exact match
+  if (COOKIE_KNOWLEDGE[name]) return COOKIE_KNOWLEDGE[name];
+  // Prefix match
+  for (const prefix in COOKIE_PREFIX_KNOWLEDGE) {
+    if (name.startsWith(prefix)) return COOKIE_PREFIX_KNOWLEDGE[prefix];
+  }
+  // Heuristic guesses
+  const lower = name.toLowerCase();
+  if (lower.includes('csrf') || lower.includes('xsrf')) return { purpose: 'Cross-site request forgery protection', category: 'security' };
+  if (lower.includes('session') || lower.includes('sess')) return { purpose: 'Server session identifier', category: 'auth' };
+  if (lower.includes('consent')) return { purpose: 'Cookie consent preference', category: 'preference' };
+  if (lower.includes('lang') || lower.includes('locale')) return { purpose: 'Language/locale preference', category: 'preference' };
+  if (lower.includes('theme') || lower.includes('dark') || lower.includes('mode')) return { purpose: 'Display theme preference', category: 'preference' };
+  return null;
+}
+
+// ============================================================
+// Domain Categorization
+// ============================================================
+const CATEGORY_CONFIG = {
+  apps: {
+    label: 'Apps & Websites',
+    color: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+    dotColor: 'bg-blue-400',
+    icon: '<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"/></svg>',
+    description: 'These are cookies from websites and apps you actively use, like Google, LinkedIn, or GitHub. They store your login sessions, preferences (like language or dark mode), and settings so you do not have to log in or configure things every time you visit.',
+  },
+  ads: {
+    label: 'Ad Networks',
+    color: 'bg-red-500/20 text-red-400 border-red-500/30',
+    dotColor: 'bg-red-400',
+    icon: '<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.34 15.84c-.688-.06-1.386-.09-2.09-.09H7.5a4.5 4.5 0 110-9h.75c.704 0 1.402-.03 2.09-.09m0 9.18c.253.962.584 1.892.985 2.783.247.55.06 1.21-.463 1.511l-.657.38c-.551.318-1.26.117-1.527-.461a20.845 20.845 0 01-1.44-4.282m3.102.069a18.03 18.03 0 01-.59-4.59c0-1.586.205-3.124.59-4.59m0 9.18a23.848 23.848 0 018.835 2.535M10.34 6.66a23.847 23.847 0 008.835-2.535m0 0A23.74 23.74 0 0018.795 3m.38 1.125a23.91 23.91 0 011.014 5.395m-1.014 8.855c-.118.38-.245.754-.38 1.125m.38-1.125a23.91 23.91 0 001.014-5.395m0-3.46c.495.413.811 1.035.811 1.73 0 .695-.316 1.317-.811 1.73m0-3.46a24.347 24.347 0 010 3.46"/></svg>',
+    description: 'Ad network cookies are placed by companies that serve advertisements across many websites. They track which sites you visit to build a profile of your interests, then show you targeted ads. These cookies come from companies you have never directly visited -- they are embedded in other websites.',
+  },
+  analytics: {
+    label: 'Analytics & Tracking',
+    color: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+    dotColor: 'bg-purple-400',
+    icon: '<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/></svg>',
+    description: 'Analytics cookies help website owners understand how people use their sites. They track things like which pages you visit, how long you stay, and what you click on. This data is usually aggregated and anonymous, helping companies improve their products.',
+  },
+  cdn: {
+    label: 'CDN & Infrastructure',
+    color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
+    dotColor: 'bg-cyan-400',
+    icon: '<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3m-19.5 0a4.5 4.5 0 01.9-2.7L5.737 5.1a3.375 3.375 0 012.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 01.9 2.7m0 0a3 3 0 01-3 3m0 3h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008zm-3 6h.008v.008h-.008v-.008zm0-6h.008v.008H15v-.008z"/></svg>',
+    description: 'Infrastructure cookies come from the technical backbone of the internet -- Content Delivery Networks (CDNs), security services, and cloud providers. They help pages load faster by routing you to the nearest server, protect against bots and attacks, and manage load balancing.',
+  },
+  other: {
+    label: 'Other / Unknown',
+    color: 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30',
+    dotColor: 'bg-zinc-400',
+    icon: '<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z"/></svg>',
+    description: 'These cookies come from domains that do not fit neatly into the other categories. They might be niche trackers, specialized services, or simply less well-known companies. Some could be legitimate services, while others might be lesser-known tracking systems.',
+  },
+};
+
+const APP_DOMAINS = [
+  'linkedin', 'google', 'youtube', 'facebook', 'instagram', 'twitter', 'reddit', 'github',
+  'amazon', 'apple', 'netflix', 'spotify', 'zoom', 'slack', 'notion', 'dropbox', 'stripe',
+  'airbnb', 'godaddy', 'bill.com', 'adobe', 'claude', 'anthropic', 'vercel', 'openai',
+  'redfin', 'amtrak', 'xfinity', 'plaid', 'tailscale', 'heygen', 'capcut', 'pippit',
+  'lattice', 'synthesia', 'later.com', 'forbes', 'wired', 'hbr', 'thehindu', 'vogue',
+  'indiatimes', 'speedtest', 'lendingtree', 'stackoverflow', 'medium', 'wikipedia',
+  'figma', 'canva', 'trello', 'asana', 'jira', 'confluence', 'chatgpt', 'perplexity',
+  'whatsapp', 'telegram', 'discord', 'twitch', 'pinterest', 'ebay', 'walmart',
+  'microsoft', 'live.com', 'outlook', 'office', 'bing', 'yahoo', 'baidu',
+  'quora', 'tumblr', 'flickr', 'paypal', 'venmo', 'robinhood', 'coinbase',
+  'uber', 'lyft', 'doordash', 'grubhub', 'yelp', 'zillow', 'trulia',
+  'nytimes', 'washingtonpost', 'cnn', 'bbc', 'guardian', 'reuters', 'npr',
+  'coursera', 'udemy', 'edx', 'khan', 'duolingo',
+  'salesforce', 'hubspot', 'zendesk', 'freshdesk', 'intercom',
+  'gitlab', 'bitbucket', 'heroku', 'netlify', 'supabase', 'firebase',
+  'docker', 'npm', 'pypi', 'brew', 'homebrew',
+  'hyperverge',
+];
+
+const AD_PATTERNS = [
+  'pubmatic', 'smaato', 'media.net', 'sonobi', 'nextmill', 'intentiq', 'fwmrm',
+  'sparteo', 'tappx', 'yieldmo', 'richaudience', 'aniview', 'bfmio', 'adkernel',
+  'adtell', 'bidswitch', 'openx', 'rubiconproject', 'criteo', 'doubleclick',
+  'taboola', 'outbrain', '33across', '3lift', '4dex', '360yield', 'bricks-co',
+  'appnexus', 'adnxs', 'indexexchange', 'casale', 'sharethrough',
+  'adsrvr', 'adform', 'admob', 'adsense', 'googlesyndication', 'googleadservices',
+  'moatads', 'serving-sys', 'smartadserver', 'teads', 'tribalfusion',
+  'contextweb', 'conversant', 'undertone', 'yieldlab', 'zedo',
+  'spotxchange', 'liadm', 'demdex', 'krxd', 'bluekai', 'exelator',
+  'mathtag', 'mookie1', 'rfihub', 'rlcdn', 'simpli.fi', 'turn.com',
+  'agkn.com', 'eyeota', 'w55c', 'imrworldwide', 'scorecardresearch',
+  'quantserve', 'quantcount',
+];
+
+const ANALYTICS_PATTERNS = [
+  'analytics', 'track', 'pixel', 'sync', 'match', 'segment', 'mixpanel',
+  'hotjar', 'amplitude', 'clarity', 'newrelic', 'datadog', 'sentry',
+  'logrocket', 'gtag', 'user-sync', 'marketo', 'hubspot', 'salesforce',
+  'pardot', 'eloqua', 'demandbase', 'fullstory', 'mouseflow', 'crazyegg',
+  'optimizely', 'vwo', 'abtasty', 'heap', 'pendo', 'appcues',
+  'snowplow', 'matomo', 'plausible', 'fathom', 'clicky',
+  'chartbeat', 'parsely', 'omtrdc', 'omniture', 'coremetrics',
+];
+
+const CDN_PATTERNS = [
+  'cdn', 'cloudfront', 'cloudflare', 'akamai', 'fastly', 'jsdelivr', 'unpkg',
+  'gstatic', 'googleapis', 'azureedge', 'azurefd', 'edgecastcdn', 'stackpath',
+  'bootstrapcdn', 'cdnjs', 'imgix', 'cloudinary', 'twimg', 'fbcdn',
+  'akamaized', 'edgekey', 'llnwd', 'limelight', 'cachefly',
+];
+
+// Extra ad-network patterns that should match if the domain starts/contains "ad" or "ads."
+const AD_PREFIX_PATTERNS = ['ads.', 'ad.', 'adserver.', 'adservice.'];
+
+function categorizeDomain(domain) {
+  const d = domain.toLowerCase().replace(/^\./, '');
+
+  // Check apps first (exact substring in domain)
+  for (const app of APP_DOMAINS) {
+    if (d.includes(app)) return 'apps';
+  }
+
+  // Check ad-prefix patterns
+  for (const prefix of AD_PREFIX_PATTERNS) {
+    if (d.startsWith(prefix)) return 'ads';
+  }
+
+  // Check ad networks
+  for (const pattern of AD_PATTERNS) {
+    if (d.includes(pattern)) return 'ads';
+  }
+
+  // Check analytics
+  for (const pattern of ANALYTICS_PATTERNS) {
+    if (d.includes(pattern)) return 'analytics';
+  }
+
+  // Check CDN
+  for (const pattern of CDN_PATTERNS) {
+    if (d.includes(pattern)) return 'cdn';
+  }
+
+  return 'other';
+}
+
+// ============================================================
+// State
+// ============================================================
+let cookieData = null;
+let categorizedDomains = {};  // { category: [{ domain, cookies }] }
+let activeCategory = 'all';
+let expandedDomains = new Set();
+let searchQuery = '';
+
+// ============================================================
+// Data Loading
+// ============================================================
+function readFromDOM() {
+  const el = document.getElementById('__cookie_extractor_data__');
+  if (!el) return null;
+  try {
+    const data = JSON.parse(el.textContent);
+    if (data && data.cookiesByDomain && Object.keys(data.cookiesByDomain).length > 0) {
+      return data;
+    }
+  } catch (e) {
+    console.warn('Failed to parse cookie data from DOM:', e);
+  }
+  return null;
+}
+
+function loadData(data) {
+  cookieData = data;
+  categorizedDomains = { apps: [], ads: [], analytics: [], cdn: [], other: [] };
+
+  if (data && data.cookiesByDomain) {
+    for (const domain of Object.keys(data.cookiesByDomain).sort()) {
+      const cat = categorizeDomain(domain);
+      categorizedDomains[cat].push({
+        domain,
+        cookies: data.cookiesByDomain[domain],
+      });
+    }
+  }
+
+  renderDashboard();
+}
+
+function refreshData() {
+  // Try to trigger extension refresh
+  try {
+    document.dispatchEvent(new CustomEvent('__cookie_extractor_refresh__'));
+  } catch (e) {}
+
+  // Re-read after a brief delay to let extension update
+  setTimeout(() => {
+    const data = readFromDOM();
+    if (data) {
+      loadData(data);
+      showToast('Data refreshed');
+    } else {
+      showToast('No new data available');
+    }
+  }, 500);
+}
+
+function loadManualJSON() {
+  const textarea = document.getElementById('manual-json-input');
+  const errorEl = document.getElementById('manual-json-error');
+
+  try {
+    const data = JSON.parse(textarea.value);
+    if (!data.cookiesByDomain) {
+      throw new Error('Missing "cookiesByDomain" property. Please provide the full cookie data JSON.');
+    }
+    errorEl.classList.add('hidden');
+    loadData(data);
+    showToast('Data loaded successfully');
+  } catch (e) {
+    errorEl.textContent = e.message;
+    errorEl.classList.remove('hidden');
+  }
+}
+
+function copyAllAsJSON() {
+  if (!cookieData) {
+    showToast('No data to copy');
+    return;
+  }
+  navigator.clipboard.writeText(JSON.stringify(cookieData, null, 2)).then(() => {
+    showToast('Copied to clipboard');
+  }).catch(() => {
+    showToast('Failed to copy');
+  });
+}
+
+// ============================================================
+// Rendering
+// ============================================================
+function renderDashboard() {
+  const noDataEl = document.getElementById('no-data-state');
+  const dashboardEl = document.getElementById('dashboard');
+
+  if (!cookieData || !cookieData.cookiesByDomain) {
+    noDataEl.classList.remove('hidden');
+    dashboardEl.classList.add('hidden');
+    return;
+  }
+
+  noDataEl.classList.add('hidden');
+  dashboardEl.classList.remove('hidden');
+
+  renderStats();
+  renderCategoryTabs();
+  renderDomainList();
+}
+
+function renderStats() {
+  document.getElementById('stat-total').textContent = (cookieData.totalCookies || 0).toLocaleString();
+  document.getElementById('stat-domains').textContent = (cookieData.domainCount || 0).toLocaleString();
+
+  // Last updated
+  const updatedEl = document.getElementById('stat-updated');
+  if (cookieData.timestamp) {
+    const d = new Date(cookieData.timestamp);
+    const now = new Date();
+    const diffMs = now - d;
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) {
+      updatedEl.textContent = 'Just now';
+    } else if (diffMins < 60) {
+      updatedEl.textContent = `${diffMins}m ago`;
+    } else if (diffMins < 1440) {
+      updatedEl.textContent = `${Math.floor(diffMins / 60)}h ago`;
+    } else {
+      updatedEl.textContent = d.toLocaleDateString();
+    }
+    updatedEl.title = d.toLocaleString();
+  } else {
+    updatedEl.textContent = '--';
+  }
+
+  // Category breakdown
+  const catEl = document.getElementById('stat-categories');
+  catEl.innerHTML = '';
+  const catOrder = ['apps', 'ads', 'analytics', 'cdn', 'other'];
+  for (const cat of catOrder) {
+    const count = categorizedDomains[cat]?.length || 0;
+    if (count === 0) continue;
+    const cfg = CATEGORY_CONFIG[cat];
+    const badge = document.createElement('span');
+    badge.className = `inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${cfg.color}`;
+    badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full ${cfg.dotColor}"></span>${count}`;
+    badge.title = `${cfg.label}: ${count} domains`;
+    catEl.appendChild(badge);
+  }
+}
+
+function renderCategoryTabs() {
+  const container = document.getElementById('category-tabs');
+  container.innerHTML = '';
+
+  // "All" tab
+  const allCount = Object.values(categorizedDomains).reduce((sum, arr) => sum + arr.length, 0);
+  container.appendChild(createTab('all', `All (${allCount})`, null));
+
+  const catOrder = ['apps', 'ads', 'analytics', 'cdn', 'other'];
+  for (const cat of catOrder) {
+    const count = categorizedDomains[cat]?.length || 0;
+    const cfg = CATEGORY_CONFIG[cat];
+    container.appendChild(createTab(cat, `${cfg.label} (${count})`, cfg));
+  }
+}
+
+function createTab(id, label, cfg) {
+  const btn = document.createElement('button');
+  const isActive = activeCategory === id;
+  btn.className = `category-tab inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-sm font-medium transition-colors ${
+    isActive
+      ? 'border-zinc-600 text-zinc-100 bg-zinc-800'
+      : 'border-zinc-800 text-zinc-500 hover:text-zinc-300 hover:border-zinc-700 bg-zinc-900/30'
+  }`;
+  if (cfg) {
+    btn.innerHTML = cfg.icon + ' ' + label;
+  } else {
+    btn.textContent = label;
+  }
+  btn.addEventListener('click', () => {
+    activeCategory = id;
+    renderCategoryTabs();
+    renderDomainList();
+  });
+  return btn;
+}
+
+function renderDomainList() {
+  const container = document.getElementById('domain-list');
+  const noResults = document.getElementById('no-results');
+  container.innerHTML = '';
+
+  const categoriesToShow = activeCategory === 'all'
+    ? ['apps', 'ads', 'analytics', 'cdn', 'other']
+    : [activeCategory];
+
+  let totalVisible = 0;
+  const query = searchQuery.toLowerCase().trim();
+
+  for (const cat of categoriesToShow) {
+    const domains = categorizedDomains[cat] || [];
+    if (domains.length === 0) continue;
+
+    const cfg = CATEGORY_CONFIG[cat];
+
+    // Filter domains by search
+    const filteredDomains = query
+      ? domains.filter(d => {
+          if (d.domain.toLowerCase().includes(query)) return true;
+          return d.cookies.some(c => c.name.toLowerCase().includes(query));
+        })
+      : domains;
+
+    if (filteredDomains.length === 0) continue;
+    totalVisible += filteredDomains.length;
+
+    // Category header
+    const header = document.createElement('div');
+    header.className = 'flex items-center gap-2 mt-6 mb-2 first:mt-0';
+    header.innerHTML = `
+      <span class="inline-flex items-center gap-1.5 text-sm font-medium ${cfg.color.split(' ').filter(c => c.startsWith('text-')).join(' ')}">
+        ${cfg.icon}
+        ${cfg.label}
+      </span>
+      <span class="text-xs text-zinc-600">${filteredDomains.length} domain${filteredDomains.length !== 1 ? 's' : ''}</span>
+      <div class="flex-1 border-t border-zinc-800/60"></div>
+      <button class="learn-more-btn text-xs text-zinc-600 hover:text-zinc-400 transition-colors" data-cat="${cat}">Learn more</button>
+    `;
+    container.appendChild(header);
+
+    // Learn more content
+    const learnMore = document.createElement('div');
+    learnMore.className = 'learn-more-content mb-3';
+    learnMore.id = `learn-more-${cat}`;
+    learnMore.innerHTML = `
+      <div class="ml-6 px-4 py-3 rounded-md bg-zinc-900/50 border border-zinc-800/60 text-sm text-zinc-400 leading-relaxed">
+        ${cfg.description}
+      </div>
+    `;
+    container.appendChild(learnMore);
+
+    // Add click handler for learn more
+    header.querySelector('.learn-more-btn').addEventListener('click', () => {
+      learnMore.classList.toggle('open');
+    });
+
+    // Domain rows
+    for (const domainEntry of filteredDomains) {
+      container.appendChild(renderDomainRow(domainEntry, cat, query));
+    }
+  }
+
+  if (totalVisible === 0) {
+    noResults.classList.remove('hidden');
+  } else {
+    noResults.classList.add('hidden');
+  }
+}
+
+function renderDomainRow(domainEntry, category, query) {
+  const { domain, cookies } = domainEntry;
+  const isExpanded = expandedDomains.has(domain);
+  const cfg = CATEGORY_CONFIG[category];
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'animate-fade-in';
+
+  // Domain header row
+  const row = document.createElement('div');
+  row.className = `domain-row flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer select-none ${isExpanded ? 'expanded bg-zinc-900/50' : ''}`;
+
+  // Highlight matching cookies count if searching
+  let matchingCookieCount = 0;
+  if (query) {
+    matchingCookieCount = cookies.filter(c => c.name.toLowerCase().includes(query)).length;
+  }
+
+  const cleanDomain = domain.replace(/^\./, '');
+
+  row.innerHTML = `
+    <svg class="expand-icon w-4 h-4 text-zinc-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+    <span class="w-2 h-2 rounded-full ${cfg.dotColor} flex-shrink-0 opacity-60"></span>
+    <span class="text-sm font-medium text-zinc-200 truncate">${escapeHtml(cleanDomain)}</span>
+    <span class="ml-auto flex items-center gap-2 flex-shrink-0">
+      ${matchingCookieCount > 0 ? `<span class="text-xs text-amber-400">${matchingCookieCount} match${matchingCookieCount !== 1 ? 'es' : ''}</span>` : ''}
+      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-800 text-zinc-400 border border-zinc-700/50">${cookies.length}</span>
+    </span>
+  `;
+
+  row.addEventListener('click', () => {
+    if (expandedDomains.has(domain)) {
+      expandedDomains.delete(domain);
+    } else {
+      expandedDomains.add(domain);
+    }
+    renderDomainList();
+  });
+
+  wrapper.appendChild(row);
+
+  // Expanded cookie table
+  if (isExpanded) {
+    const detail = document.createElement('div');
+    detail.className = 'ml-6 mr-1 mb-2 border border-zinc-800 rounded-lg overflow-hidden animate-slide-down';
+
+    // Table header
+    let tableHTML = `
+      <div class="grid grid-cols-[1fr_auto_auto_1fr] gap-x-4 px-4 py-2 bg-zinc-900/80 border-b border-zinc-800 text-xs font-medium text-zinc-500 uppercase tracking-wider">
+        <span>Name</span>
+        <span>Flags</span>
+        <span>Expiry</span>
+        <span>Purpose</span>
+      </div>
+    `;
+
+    // Sort cookies: known ones first, then alphabetical
+    const sortedCookies = [...cookies].sort((a, b) => {
+      const aKnown = lookupCookiePurpose(a.name) ? 0 : 1;
+      const bKnown = lookupCookiePurpose(b.name) ? 0 : 1;
+      if (aKnown !== bKnown) return aKnown - bKnown;
+      return a.name.localeCompare(b.name);
+    });
+
+    for (const cookie of sortedCookies) {
+      const knowledge = lookupCookiePurpose(cookie.name);
+      const isMatch = query && cookie.name.toLowerCase().includes(query);
+
+      // Flags
+      const flags = [];
+      if (cookie.secure) flags.push('<span class="badge bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">Secure</span>');
+      if (cookie.httpOnly) flags.push('<span class="badge bg-rose-500/15 text-rose-400 border border-rose-500/20">HttpOnly</span>');
+      if (cookie.session) {
+        flags.push('<span class="badge bg-amber-500/15 text-amber-400 border border-amber-500/20">Session</span>');
+      } else {
+        flags.push('<span class="badge bg-sky-500/15 text-sky-400 border border-sky-500/20">Persistent</span>');
+      }
+      if (cookie.sameSite && cookie.sameSite !== 'unspecified') {
+        flags.push(`<span class="badge bg-zinc-500/15 text-zinc-400 border border-zinc-600/30">${escapeHtml(cookie.sameSite)}</span>`);
+      }
+
+      // Expiry
+      let expiry = 'Session';
+      if (cookie.expirationDate) {
+        const exp = new Date(cookie.expirationDate * 1000);
+        const now = new Date();
+        const diffDays = Math.round((exp - now) / 86400000);
+        if (diffDays < 0) {
+          expiry = `<span class="text-red-400">Expired</span>`;
+        } else if (diffDays === 0) {
+          expiry = 'Today';
+        } else if (diffDays === 1) {
+          expiry = 'Tomorrow';
+        } else if (diffDays < 30) {
+          expiry = `${diffDays}d`;
+        } else if (diffDays < 365) {
+          expiry = `${Math.round(diffDays / 30)}mo`;
+        } else {
+          expiry = `${(diffDays / 365).toFixed(1)}y`;
+        }
+      }
+
+      // Truncated value
+      const truncVal = cookie.value && cookie.value.length > 20
+        ? cookie.value.substring(0, 20) + '...'
+        : cookie.value || '';
+
+      // Purpose
+      const purposeHTML = knowledge
+        ? `<span class="text-zinc-300">${escapeHtml(knowledge.purpose)}</span>`
+        : `<span class="text-zinc-600 italic">Unknown</span>`;
+
+      // Purpose category badge
+      const purposeCatBadge = knowledge ? getCategoryBadge(knowledge.category) : '';
+
+      tableHTML += `
+        <div class="cookie-row grid grid-cols-[1fr_auto_auto_1fr] gap-x-4 items-start px-4 py-2.5 border-b border-zinc-800/50 last:border-b-0 ${isMatch ? 'bg-amber-500/5' : ''}">
+          <div class="min-w-0">
+            <div class="font-mono text-sm font-medium ${isMatch ? 'text-amber-300' : 'text-zinc-200'} truncate" title="${escapeHtml(cookie.name)}">${escapeHtml(cookie.name)}</div>
+            <div class="font-mono text-xs text-zinc-600 truncate mt-0.5" title="${escapeHtml(cookie.value || '')}">${escapeHtml(truncVal)}</div>
+          </div>
+          <div class="flex flex-wrap gap-1 max-w-xs">${flags.join('')}</div>
+          <div class="text-xs text-zinc-400 whitespace-nowrap tabular-nums">${expiry}</div>
+          <div class="text-xs leading-relaxed min-w-0">
+            <span class="flex items-center gap-1.5 flex-wrap">${purposeCatBadge}${purposeHTML}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    detail.innerHTML = tableHTML;
+    wrapper.appendChild(detail);
+  }
+
+  return wrapper;
+}
+
+function getCategoryBadge(cat) {
+  const badgeColors = {
+    auth: 'bg-green-500/15 text-green-400 border-green-500/20',
+    security: 'bg-orange-500/15 text-orange-400 border-orange-500/20',
+    tracking: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/20',
+    analytics: 'bg-purple-500/15 text-purple-400 border-purple-500/20',
+    advertising: 'bg-red-500/15 text-red-400 border-red-500/20',
+    preference: 'bg-blue-500/15 text-blue-400 border-blue-500/20',
+    infrastructure: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/20',
+    functionality: 'bg-teal-500/15 text-teal-400 border-teal-500/20',
+  };
+  const color = badgeColors[cat] || 'bg-zinc-500/15 text-zinc-400 border-zinc-600/30';
+  const label = cat.charAt(0).toUpperCase() + cat.slice(1);
+  return `<span class="badge ${color} border text-[10px]">${label}</span>`;
+}
+
+// ============================================================
+// Search
+// ============================================================
+function handleSearch(value) {
+  searchQuery = value;
+  const clearBtn = document.getElementById('search-clear');
+  if (value.length > 0) {
+    clearBtn.classList.remove('hidden');
+  } else {
+    clearBtn.classList.add('hidden');
+  }
+  renderDomainList();
+}
+
+function clearSearch() {
+  const input = document.getElementById('search-input');
+  input.value = '';
+  searchQuery = '';
+  document.getElementById('search-clear').classList.add('hidden');
+  renderDomainList();
+  input.focus();
+}
+
+// ============================================================
+// Utils
+// ============================================================
+function escapeHtml(str) {
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.style.transform = 'translateY(0)';
+  toast.style.opacity = '1';
+  setTimeout(() => {
+    toast.style.transform = 'translateY(20px)';
+    toast.style.opacity = '0';
+  }, 2000);
+}
+
+// ============================================================
+// Initialization
+// ============================================================
+function init() {
+  const data = readFromDOM();
+  if (data) {
+    loadData(data);
+  } else {
+    document.getElementById('no-data-state').classList.remove('hidden');
+    document.getElementById('dashboard').classList.add('hidden');
+  }
+
+  // Watch for DOM changes (extension might inject data later)
+  const observer = new MutationObserver(() => {
+    if (!cookieData) {
+      const data = readFromDOM();
+      if (data) {
+        loadData(data);
+        observer.disconnect();
+      }
+    }
+  });
+  observer.observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    // Cmd/Ctrl+K to focus search
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      document.getElementById('search-input')?.focus();
+    }
+    // Escape to clear search
+    if (e.key === 'Escape') {
+      clearSearch();
+    }
+  });
+}
+
+// Start
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
