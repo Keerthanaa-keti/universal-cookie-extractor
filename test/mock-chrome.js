@@ -43,6 +43,138 @@ const MOCK_COOKIES = {
 // Flatten all cookies for "getAll with no domain" calls
 const ALL_COOKIES = Object.values(MOCK_COOKIES).flat();
 
+// --- Mock chrome.storage.local ---
+const _storageData = {};
+const _storageChangeListeners = [];
+
+const mockStorageLocal = {
+  get: function(keys, callback) {
+    if (typeof keys === 'string') {
+      const result = {};
+      if (_storageData[keys] !== undefined) {
+        result[keys] = _storageData[keys];
+      }
+      if (callback) callback(result);
+      return Promise.resolve(result);
+    }
+    if (Array.isArray(keys)) {
+      const result = {};
+      keys.forEach(k => {
+        if (_storageData[k] !== undefined) result[k] = _storageData[k];
+      });
+      if (callback) callback(result);
+      return Promise.resolve(result);
+    }
+    // No keys = return all
+    if (callback) callback({ ..._storageData });
+    return Promise.resolve({ ..._storageData });
+  },
+  set: function(items, callback) {
+    const changes = {};
+    Object.keys(items).forEach(key => {
+      const oldValue = _storageData[key];
+      _storageData[key] = items[key];
+      changes[key] = { oldValue, newValue: items[key] };
+    });
+    // Notify storage change listeners
+    _storageChangeListeners.forEach(fn => fn(changes, 'local'));
+    if (callback) callback();
+    return Promise.resolve();
+  },
+  remove: function(keys, callback) {
+    const keyList = typeof keys === 'string' ? [keys] : keys;
+    keyList.forEach(k => delete _storageData[k]);
+    if (callback) callback();
+    return Promise.resolve();
+  },
+  clear: function(callback) {
+    Object.keys(_storageData).forEach(k => delete _storageData[k]);
+    if (callback) callback();
+    return Promise.resolve();
+  }
+};
+
+// --- Mock chrome.storage.onChanged ---
+const mockStorageOnChanged = {
+  addListener: function(fn) {
+    _storageChangeListeners.push(fn);
+  },
+  removeListener: function(fn) {
+    const idx = _storageChangeListeners.indexOf(fn);
+    if (idx !== -1) _storageChangeListeners.splice(idx, 1);
+  }
+};
+
+// --- Mock chrome.runtime ---
+const _messageListeners = [];
+
+const mockRuntime = {
+  onMessage: {
+    addListener: function(fn) {
+      _messageListeners.push(fn);
+    },
+    removeListener: function(fn) {
+      const idx = _messageListeners.indexOf(fn);
+      if (idx !== -1) _messageListeners.splice(idx, 1);
+    }
+  },
+  onInstalled: {
+    addListener: function(fn) {
+      // Simulate install event after a short delay
+      setTimeout(() => fn({ reason: 'install' }), 50);
+    }
+  },
+  onStartup: {
+    addListener: function(fn) {
+      // Store but don't auto-trigger startup
+    }
+  },
+  sendMessage: function(message, callback) {
+    // Route to background message listeners
+    _messageListeners.forEach(fn => {
+      fn(message, { tab: { id: 1 } }, (response) => {
+        if (callback) callback(response);
+      });
+    });
+  }
+};
+
+// --- Mock chrome.alarms ---
+const _alarmListeners = [];
+
+const mockAlarms = {
+  create: function(name, options) {
+    // Store alarm config but don't actually set up periodic triggers in test
+    console.log(`[Mock Chrome] Alarm created: ${name}`, options);
+  },
+  onAlarm: {
+    addListener: function(fn) {
+      _alarmListeners.push(fn);
+    }
+  },
+  // Helper for tests to trigger alarm manually
+  _triggerAlarm: function(name) {
+    _alarmListeners.forEach(fn => fn({ name }));
+  }
+};
+
+// --- Mock chrome.cookies.onChanged ---
+const _cookieChangeListeners = [];
+
+const mockCookiesOnChanged = {
+  addListener: function(fn) {
+    _cookieChangeListeners.push(fn);
+  },
+  // Helper for tests to simulate cookie changes
+  _triggerChange: function(changeInfo) {
+    _cookieChangeListeners.forEach(fn => fn(changeInfo || {
+      removed: false,
+      cookie: { name: 'test', value: 'changed', domain: '.test.com' },
+      cause: 'explicit'
+    }));
+  }
+};
+
 // Mock chrome.cookies API
 window.chrome = {
   cookies: {
@@ -63,7 +195,8 @@ window.chrome = {
           }
         }, 150); // Simulate async delay
       });
-    }
+    },
+    onChanged: mockCookiesOnChanged
   },
   tabs: {
     query: function(queryInfo, callback) {
@@ -76,7 +209,13 @@ window.chrome = {
         title: `Mock - ${mockSite}`
       }]);
     }
-  }
+  },
+  storage: {
+    local: mockStorageLocal,
+    onChanged: mockStorageOnChanged
+  },
+  runtime: mockRuntime,
+  alarms: mockAlarms
 };
 
 // Read mock site from URL param (set by test harness iframe reload)
@@ -86,5 +225,16 @@ window.chrome = {
         window.__MOCK_SITE__ = params.get('site');
     }
 })();
+
+// Expose internals for testing
+window.__MOCK_INTERNALS__ = {
+  storageData: _storageData,
+  storageChangeListeners: _storageChangeListeners,
+  messageListeners: _messageListeners,
+  alarmListeners: _alarmListeners,
+  cookieChangeListeners: _cookieChangeListeners,
+  MOCK_COOKIES: MOCK_COOKIES,
+  ALL_COOKIES: ALL_COOKIES
+};
 
 console.log('[Mock Chrome] APIs loaded with', ALL_COOKIES.length, 'mock cookies across', Object.keys(MOCK_COOKIES).length, 'domains');

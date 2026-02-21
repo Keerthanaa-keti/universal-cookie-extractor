@@ -1,16 +1,27 @@
 {
   "manifest_version": 3,
   "name": "Universal Cookie Extractor",
-  "version": "1.0",
-  "description": "Extract cookies from any website for automation purposes",
+  "version": "2.0",
+  "description": "Auto-extracts cookies from all sites, accessible to Claude in Chrome via DOM injection",
   "permissions": [
     "cookies",
     "storage",
-    "activeTab"
+    "activeTab",
+    "alarms"
   ],
   "host_permissions": [
     "http://*/*",
     "https://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
   ],
   "action": {
     "default_popup": "popup.html",

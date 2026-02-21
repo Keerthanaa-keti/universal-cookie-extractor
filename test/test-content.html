@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Content Script Test Page</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h2 { color: #333; }
+        .test-result {
+            padding: 8px 12px;
+            margin: 4px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        .pass { background: #d4edda; color: #155724; }
+        .fail { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        #dataPreview {
+            background: #1a1a2e;
+            color: #00d4ff;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <h2>Content Script Test Page</h2>
+    <p>This page loads mock-chrome.js + content.js and verifies DOM elements are created and populated.</p>
+
+    <div id="testResults"></div>
+
+    <h3>Data Element Preview</h3>
+    <div id="dataPreview">Loading...</div>
+
+    <!-- Mock Chrome APIs MUST load first -->
+    <script src="mock-chrome.js"></script>
+
+    <script>
+        // Pre-populate storage with mock cookie data (simulates what background.js would do)
+        const mockCookieData = {
+            timestamp: new Date().toISOString(),
+            totalCookies: window.__MOCK_INTERNALS__.ALL_COOKIES.length,
+            domainCount: Object.keys(window.__MOCK_INTERNALS__.MOCK_COOKIES).length,
+            domains: Object.keys(window.__MOCK_INTERNALS__.MOCK_COOKIES).sort(),
+            cookiesByDomain: {}
+        };
+
+        // Group cookies by domain like background.js does
+        window.__MOCK_INTERNALS__.ALL_COOKIES.forEach(cookie => {
+            const domain = cookie.domain;
+            if (!mockCookieData.cookiesByDomain[domain]) {
+                mockCookieData.cookiesByDomain[domain] = [];
+            }
+            mockCookieData.cookiesByDomain[domain].push({
+                name: cookie.name,
+                value: cookie.value,
+                domain: cookie.domain,
+                path: cookie.path,
+                secure: cookie.secure,
+                httpOnly: cookie.httpOnly,
+                sameSite: cookie.sameSite,
+                expirationDate: cookie.expirationDate,
+                session: !cookie.expirationDate
+            });
+        });
+
+        chrome.storage.local.set({ cookieData: mockCookieData });
+    </script>
+
+    <!-- Content script loads after storage is pre-populated -->
+    <script src="../content.js"></script>
+
+    <script>
+        const results = document.getElementById('testResults');
+        const preview = document.getElementById('dataPreview');
+
+        function log(type, msg) {
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            const prefix = type === 'pass' ? 'PASS' : type === 'fail' ? 'FAIL' : 'INFO';
+            div.textContent = `[${prefix}] ${msg}`;
+            results.appendChild(div);
+        }
+
+        async function runTests() {
+            let passed = 0, failed = 0;
+
+            // Wait for content.js to initialize
+            await new Promise(r => setTimeout(r, 300));
+
+            // Test 1: Data element exists
+            const dataEl = document.getElementById('__cookie_extractor_data__');
+            if (dataEl) {
+                log('pass', 'Data element created');
+                passed++;
+            } else {
+                log('fail', 'Data element NOT found');
+                failed++;
+            }
+
+            // Test 2: Meta element exists
+            const metaEl = document.getElementById('__cookie_extractor_meta__');
+            if (metaEl) {
+                log('pass', 'Meta element created');
+                passed++;
+            } else {
+                log('fail', 'Meta element NOT found');
+                failed++;
+            }
+
+            // Test 3: Data element is hidden
+            if (dataEl && dataEl.style.display === 'none') {
+                log('pass', 'Data element is hidden (display:none)');
+                passed++;
+            } else {
+                log('fail', 'Data element is NOT hidden');
+                failed++;
+            }
+
+            // Test 4: Data contains valid JSON with cookies
+            try {
+                const data = JSON.parse(dataEl.textContent);
+                if (data.totalCookies > 0 && data.cookiesByDomain) {
+                    log('pass', `Data contains ${data.totalCookies} cookies from ${data.domainCount} domains`);
+                    passed++;
+                } else {
+                    throw new Error('Missing cookie data fields');
+                }
+            } catch(e) {
+                log('fail', `Data JSON invalid: ${e.message}`);
+                failed++;
+            }
+
+            // Test 5: Meta contains valid JSON with status
+            try {
+                const meta = JSON.parse(metaEl.textContent);
+                if (meta.status === 'ok' && meta.timestamp && meta.totalCookies > 0) {
+                    log('pass', `Meta shows status=ok, ${meta.totalCookies} cookies`);
+                    passed++;
+                } else {
+                    throw new Error(`Unexpected meta: ${JSON.stringify(meta)}`);
+                }
+            } catch(e) {
+                log('fail', `Meta JSON invalid: ${e.message}`);
+                failed++;
+            }
+
+            // Test 6: Storage change auto-updates DOM
+            try {
+                const updatedData = { ...mockCookieData, timestamp: 'UPDATED_TIMESTAMP', totalCookies: 999 };
+                await chrome.storage.local.set({ cookieData: updatedData });
+                await new Promise(r => setTimeout(r, 100));
+                const freshData = JSON.parse(document.getElementById('__cookie_extractor_data__').textContent);
+                if (freshData.totalCookies === 999 && freshData.timestamp === 'UPDATED_TIMESTAMP') {
+                    log('pass', 'Storage change auto-updated DOM');
+                    passed++;
+                } else {
+                    throw new Error('DOM not updated after storage change');
+                }
+            } catch(e) {
+                log('fail', `Storage auto-update: ${e.message}`);
+                failed++;
+            }
+
+            // Test 7: Refresh event triggers update
+            try {
+                document.dispatchEvent(new CustomEvent('__cookie_extractor_refresh__'));
+                await new Promise(r => setTimeout(r, 500));
+                const dataAfterRefresh = JSON.parse(document.getElementById('__cookie_extractor_data__').textContent);
+                if (dataAfterRefresh && dataAfterRefresh.totalCookies > 0) {
+                    log('pass', 'Refresh event triggered and DOM updated');
+                    passed++;
+                } else {
+                    throw new Error('No data after refresh');
+                }
+            } catch(e) {
+                log('fail', `Refresh event: ${e.message}`);
+                failed++;
+            }
+
+            // Test 8: Claude in Chrome access pattern works
+            try {
+                // This is exactly how Claude in Chrome would read it
+                const cookieJSON = JSON.parse(document.getElementById('__cookie_extractor_data__').textContent);
+                const metaJSON = JSON.parse(document.getElementById('__cookie_extractor_meta__').textContent);
+                if (cookieJSON.cookiesByDomain && metaJSON.status === 'ok') {
+                    log('pass', 'Claude in Chrome access pattern works');
+                    passed++;
+                } else {
+                    throw new Error('Access pattern failed');
+                }
+            } catch(e) {
+                log('fail', `Claude access pattern: ${e.message}`);
+                failed++;
+            }
+
+            log('info', `---`);
+            log(failed === 0 ? 'pass' : 'fail', `Results: ${passed}/${passed + failed} passed, ${failed} failed`);
+
+            // Update data preview
+            try {
+                const data = JSON.parse(document.getElementById('__cookie_extractor_data__').textContent);
+                preview.textContent = JSON.stringify(data, null, 2).substring(0, 2000) + '\n...';
+            } catch(e) {
+                preview.textContent = 'Error: ' + e.message;
+            }
+        }
+
+        runTests();
+    </script>
+</body>
+</html>

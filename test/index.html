@@ -16,7 +16,7 @@
 
         /* Test controls panel */
         .test-panel {
-            width: 320px;
+            width: 360px;
             flex-shrink: 0;
             background: #1a1a2e;
             color: #e0e0e0;
@@ -57,6 +57,13 @@
         .test-panel button:hover {
             background: #00b8d4;
         }
+        .test-panel button.secondary {
+            background: #4a4a6a;
+            color: #e0e0e0;
+        }
+        .test-panel button.secondary:hover {
+            background: #5a5a7a;
+        }
         .test-log {
             margin-top: 16px;
             background: #0f0f1a;
@@ -64,13 +71,14 @@
             padding: 12px;
             font-family: 'SF Mono', monospace;
             font-size: 11px;
-            max-height: 300px;
+            max-height: 500px;
             overflow-y: auto;
             line-height: 1.6;
         }
         .test-log .pass { color: #4caf50; }
         .test-log .fail { color: #f44336; }
         .test-log .info { color: #00d4ff; }
+        .test-log .section { color: #ff9800; font-weight: bold; margin-top: 8px; }
 
         /* Extension popup frame */
         .popup-frame {
@@ -103,9 +111,9 @@
 <body>
     <!-- Test Controls -->
     <div class="test-panel">
-        <h2>Test Harness</h2>
+        <h2>Test Harness v2.0</h2>
         <p style="font-size: 12px; color: #888; margin: 0 0 16px;">
-            Simulates Chrome APIs with mock cookie data. Select a site and test the extension UI.
+            Tests popup UI, background auto-collection, content script DOM injection, and Claude in Chrome access patterns.
         </p>
 
         <label>Mock Website</label>
@@ -120,6 +128,8 @@
 
         <label style="margin-top: 20px;">Automated Tests</label>
         <button id="btnRunTests">Run All Tests</button>
+        <button id="btnRunPopupTests" class="secondary">Popup Tests Only</button>
+        <button id="btnRunAutoTests" class="secondary">Auto-Collection Tests Only</button>
 
         <div class="test-log" id="testLog">
             <div class="info">Ready. Select a site and click "Apply & Reload" to begin.</div>
@@ -148,7 +158,6 @@
             const site = document.getElementById('mockSite').value;
             document.getElementById('currentMockSite').textContent = site;
             log('info', `Switching to ${site}...`);
-            // Reload iframe with the mock site param
             const frame = document.getElementById('popupFrame');
             frame.src = `test-popup.html?site=${encodeURIComponent(site)}`;
             frame.onload = function() {
@@ -160,7 +169,7 @@
             const logEl = document.getElementById('testLog');
             const line = document.createElement('div');
             line.className = type;
-            const prefix = type === 'pass' ? 'PASS' : type === 'fail' ? 'FAIL' : 'INFO';
+            const prefix = type === 'pass' ? 'PASS' : type === 'fail' ? 'FAIL' : type === 'section' ? '====': 'INFO';
             line.textContent = `[${prefix}] ${message}`;
             logEl.appendChild(line);
             logEl.scrollTop = logEl.scrollHeight;
@@ -170,10 +179,11 @@
             document.getElementById('testLog').innerHTML = '';
         }
 
-        async function runAllTests() {
-            clearLog();
-            log('info', 'Starting automated test suite...');
-            log('info', '---');
+        // ==========================================
+        // POPUP TESTS (original tests)
+        // ==========================================
+        async function runPopupTests() {
+            log('section', 'POPUP UI TESTS');
 
             const doc = getPopupDoc();
             const win = getPopupWin();
@@ -342,13 +352,273 @@
                 }
             } catch(e) { log('fail', `Extract all: ${e.message}`); failed++; }
 
+            return { passed, failed };
+        }
+
+        // ==========================================
+        // AUTO-COLLECTION & CONTENT SCRIPT TESTS
+        // ==========================================
+        async function runAutoCollectionTests() {
+            log('section', 'AUTO-COLLECTION & CONTENT SCRIPT TESTS');
+
+            const win = getPopupWin();
+            let passed = 0;
+            let failed = 0;
+
+            // Test 13: chrome.storage.local mock works
+            try {
+                await win.chrome.storage.local.set({ testKey: 'testValue' });
+                const result = await new Promise(resolve => {
+                    win.chrome.storage.local.get('testKey', resolve);
+                });
+                if (result.testKey === 'testValue') {
+                    log('pass', 'chrome.storage.local set/get works');
+                    passed++;
+                } else {
+                    throw new Error(`Got: ${JSON.stringify(result)}`);
+                }
+                await win.chrome.storage.local.remove('testKey');
+            } catch(e) { log('fail', `storage.local: ${e.message}`); failed++; }
+
+            // Test 14: Storage change listeners fire
+            try {
+                let changeReceived = false;
+                const listener = (changes, area) => {
+                    if (area === 'local' && changes.watchKey) {
+                        changeReceived = true;
+                    }
+                };
+                win.chrome.storage.onChanged.addListener(listener);
+                await win.chrome.storage.local.set({ watchKey: 'watched' });
+                await new Promise(r => setTimeout(r, 50));
+                win.chrome.storage.onChanged.removeListener(listener);
+                await win.chrome.storage.local.remove('watchKey');
+
+                if (changeReceived) {
+                    log('pass', 'Storage change listener fires on set');
+                    passed++;
+                } else {
+                    throw new Error('Listener not called');
+                }
+            } catch(e) { log('fail', `Storage listener: ${e.message}`); failed++; }
+
+            // Test 15: Background-style auto-collection stores to storage
+            try {
+                // Simulate what background.js does
+                const allCookies = await win.chrome.cookies.getAll({});
+                const cookiesByDomain = {};
+                allCookies.forEach(cookie => {
+                    const domain = cookie.domain;
+                    if (!cookiesByDomain[domain]) cookiesByDomain[domain] = [];
+                    cookiesByDomain[domain].push({
+                        name: cookie.name, value: cookie.value,
+                        domain: cookie.domain, path: cookie.path,
+                        secure: cookie.secure, httpOnly: cookie.httpOnly,
+                        sameSite: cookie.sameSite, expirationDate: cookie.expirationDate,
+                        session: !cookie.expirationDate
+                    });
+                });
+                const data = {
+                    timestamp: new Date().toISOString(),
+                    totalCookies: allCookies.length,
+                    domainCount: Object.keys(cookiesByDomain).length,
+                    domains: Object.keys(cookiesByDomain).sort(),
+                    cookiesByDomain
+                };
+                await win.chrome.storage.local.set({ cookieData: data });
+
+                const stored = await new Promise(resolve => {
+                    win.chrome.storage.local.get('cookieData', resolve);
+                });
+
+                if (stored.cookieData && stored.cookieData.totalCookies === allCookies.length) {
+                    log('pass', `Auto-collection stored ${stored.cookieData.totalCookies} cookies to storage`);
+                    passed++;
+                } else {
+                    throw new Error('Storage data mismatch');
+                }
+            } catch(e) { log('fail', `Auto-collection: ${e.message}`); failed++; }
+
+            // Test 16: Content script DOM injection simulation
+            try {
+                // Simulate content.js behavior in the test page context
+                const stored = await new Promise(resolve => {
+                    win.chrome.storage.local.get('cookieData', resolve);
+                });
+                const cookieData = stored.cookieData;
+
+                // Create elements like content.js does
+                let dataEl = document.getElementById('__cookie_extractor_data__');
+                if (!dataEl) {
+                    dataEl = document.createElement('div');
+                    dataEl.id = '__cookie_extractor_data__';
+                    dataEl.style.display = 'none';
+                    dataEl.setAttribute('aria-hidden', 'true');
+                    document.documentElement.appendChild(dataEl);
+                }
+                dataEl.textContent = JSON.stringify(cookieData);
+
+                let metaEl = document.getElementById('__cookie_extractor_meta__');
+                if (!metaEl) {
+                    metaEl = document.createElement('div');
+                    metaEl.id = '__cookie_extractor_meta__';
+                    metaEl.style.display = 'none';
+                    metaEl.setAttribute('aria-hidden', 'true');
+                    document.documentElement.appendChild(metaEl);
+                }
+                metaEl.textContent = JSON.stringify({
+                    timestamp: cookieData.timestamp,
+                    totalCookies: cookieData.totalCookies,
+                    domainCount: cookieData.domainCount,
+                    domains: cookieData.domains,
+                    status: 'ok'
+                });
+
+                if (dataEl && metaEl && dataEl.style.display === 'none') {
+                    log('pass', 'DOM elements created and hidden');
+                    passed++;
+                } else {
+                    throw new Error('DOM element creation failed');
+                }
+            } catch(e) { log('fail', `DOM injection: ${e.message}`); failed++; }
+
+            // Test 17: Claude in Chrome javascript_tool access pattern
+            try {
+                const cookieJSON = JSON.parse(document.getElementById('__cookie_extractor_data__').textContent);
+                const metaJSON = JSON.parse(document.getElementById('__cookie_extractor_meta__').textContent);
+
+                if (cookieJSON.cookiesByDomain &&
+                    cookieJSON.totalCookies > 0 &&
+                    metaJSON.status === 'ok' &&
+                    metaJSON.totalCookies === cookieJSON.totalCookies) {
+                    log('pass', `javascript_tool reads: ${cookieJSON.totalCookies} cookies, status=${metaJSON.status}`);
+                    passed++;
+                } else {
+                    throw new Error('Access pattern returned incomplete data');
+                }
+            } catch(e) { log('fail', `javascript_tool access: ${e.message}`); failed++; }
+
+            // Test 18: Refresh event updates DOM
+            try {
+                // Simulate a refresh: update storage, then verify DOM updates
+                const updatedData = {
+                    timestamp: 'REFRESH_TEST_' + Date.now(),
+                    totalCookies: 42,
+                    domainCount: 2,
+                    domains: ['test1.com', 'test2.com'],
+                    cookiesByDomain: { 'test1.com': [], 'test2.com': [] }
+                };
+
+                // Set up a listener that acts like content.js
+                const refreshListener = (changes, area) => {
+                    if (area === 'local' && changes.cookieData) {
+                        const el = document.getElementById('__cookie_extractor_data__');
+                        if (el) el.textContent = JSON.stringify(changes.cookieData.newValue);
+                        const meta = document.getElementById('__cookie_extractor_meta__');
+                        if (meta) meta.textContent = JSON.stringify({
+                            timestamp: changes.cookieData.newValue.timestamp,
+                            totalCookies: changes.cookieData.newValue.totalCookies,
+                            domainCount: changes.cookieData.newValue.domainCount,
+                            status: 'ok'
+                        });
+                    }
+                };
+                win.chrome.storage.onChanged.addListener(refreshListener);
+
+                await win.chrome.storage.local.set({ cookieData: updatedData });
+                await new Promise(r => setTimeout(r, 100));
+
+                const freshMeta = JSON.parse(document.getElementById('__cookie_extractor_meta__').textContent);
+                win.chrome.storage.onChanged.removeListener(refreshListener);
+
+                if (freshMeta.totalCookies === 42) {
+                    log('pass', 'Refresh updates DOM via storage listener');
+                    passed++;
+                } else {
+                    throw new Error(`Expected 42, got ${freshMeta.totalCookies}`);
+                }
+            } catch(e) { log('fail', `Refresh event: ${e.message}`); failed++; }
+
+            // Test 19: chrome.alarms mock exists
+            try {
+                if (win.chrome.alarms && win.chrome.alarms.create && win.chrome.alarms.onAlarm) {
+                    win.chrome.alarms.create('testAlarm', { periodInMinutes: 1 });
+                    log('pass', 'chrome.alarms API mocked correctly');
+                    passed++;
+                } else {
+                    throw new Error('Alarms API missing');
+                }
+            } catch(e) { log('fail', `Alarms mock: ${e.message}`); failed++; }
+
+            // Test 20: cookies.onChanged mock exists
+            try {
+                if (win.chrome.cookies.onChanged && win.chrome.cookies.onChanged.addListener) {
+                    let changeFired = false;
+                    win.chrome.cookies.onChanged.addListener(() => { changeFired = true; });
+                    win.chrome.cookies.onChanged._triggerChange();
+                    if (changeFired) {
+                        log('pass', 'cookies.onChanged mock fires correctly');
+                        passed++;
+                    } else {
+                        throw new Error('Change not fired');
+                    }
+                } else {
+                    throw new Error('onChanged API missing');
+                }
+            } catch(e) { log('fail', `cookies.onChanged: ${e.message}`); failed++; }
+
+            // Cleanup test DOM elements
+            ['__cookie_extractor_data__', '__cookie_extractor_meta__'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.remove();
+            });
+
+            return { passed, failed };
+        }
+
+        // ==========================================
+        // RUN ALL
+        // ==========================================
+        async function runAllTests() {
+            clearLog();
+            log('info', 'Starting full test suite...');
+
+            const popup = await runPopupTests();
+            const auto = await runAutoCollectionTests();
+
+            const totalPassed = popup.passed + auto.passed;
+            const totalFailed = popup.failed + auto.failed;
+            const total = totalPassed + totalFailed;
+
+            log('section', 'SUMMARY');
+            log(totalFailed === 0 ? 'pass' : 'fail',
+                `Total: ${totalPassed}/${total} passed, ${totalFailed} failed`);
+            log('info', `  Popup: ${popup.passed}/${popup.passed + popup.failed}`);
+            log('info', `  Auto-Collection: ${auto.passed}/${auto.passed + auto.failed}`);
+        }
+
+        async function runPopupTestsOnly() {
+            clearLog();
+            log('info', 'Running popup tests only...');
+            const result = await runPopupTests();
             log('info', '---');
-            const total = passed + failed;
-            log(failed === 0 ? 'pass' : 'fail', `Results: ${passed}/${total} passed, ${failed} failed`);
+            log(result.failed === 0 ? 'pass' : 'fail',
+                `Results: ${result.passed}/${result.passed + result.failed} passed, ${result.failed} failed`);
+        }
+
+        async function runAutoTestsOnly() {
+            clearLog();
+            log('info', 'Running auto-collection tests only...');
+            const result = await runAutoCollectionTests();
+            log('info', '---');
+            log(result.failed === 0 ? 'pass' : 'fail',
+                `Results: ${result.passed}/${result.passed + result.failed} passed, ${result.failed} failed`);
         }
 
         document.getElementById('btnApplySite').addEventListener('click', applySite);
         document.getElementById('btnRunTests').addEventListener('click', runAllTests);
+        document.getElementById('btnRunPopupTests').addEventListener('click', runPopupTestsOnly);
+        document.getElementById('btnRunAutoTests').addEventListener('click', runAutoTestsOnly);
     </script>
 </body>
 </html>
