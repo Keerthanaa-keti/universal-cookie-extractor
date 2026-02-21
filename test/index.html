@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Cookie Extractor - Test Harness</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f0f2f5;
+            display: flex;
+            gap: 24px;
+        }
+
+        /* Test controls panel */
+        .test-panel {
+            width: 320px;
+            flex-shrink: 0;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            border-radius: 12px;
+            padding: 20px;
+            height: fit-content;
+            position: sticky;
+            top: 20px;
+        }
+        .test-panel h2 {
+            margin: 0 0 16px;
+            color: #00d4ff;
+            font-size: 16px;
+        }
+        .test-panel label {
+            display: block;
+            margin: 12px 0 4px;
+            font-size: 13px;
+            color: #aaa;
+        }
+        .test-panel select, .test-panel button {
+            width: 100%;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #333;
+            background: #16213e;
+            color: #e0e0e0;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .test-panel button {
+            background: #00d4ff;
+            color: #1a1a2e;
+            border: none;
+            font-weight: 600;
+            margin-top: 12px;
+        }
+        .test-panel button:hover {
+            background: #00b8d4;
+        }
+        .test-log {
+            margin-top: 16px;
+            background: #0f0f1a;
+            border-radius: 6px;
+            padding: 12px;
+            font-family: 'SF Mono', monospace;
+            font-size: 11px;
+            max-height: 300px;
+            overflow-y: auto;
+            line-height: 1.6;
+        }
+        .test-log .pass { color: #4caf50; }
+        .test-log .fail { color: #f44336; }
+        .test-log .info { color: #00d4ff; }
+
+        /* Extension popup frame */
+        .popup-frame {
+            width: 460px;
+            flex-shrink: 0;
+        }
+        .popup-frame h3 {
+            margin: 0 0 8px;
+            color: #333;
+            font-size: 14px;
+        }
+        .popup-frame .subtitle {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 12px;
+        }
+        .popup-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .popup-container iframe {
+            border: none;
+            width: 100%;
+            height: 700px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Test Controls -->
+    <div class="test-panel">
+        <h2>Test Harness</h2>
+        <p style="font-size: 12px; color: #888; margin: 0 0 16px;">
+            Simulates Chrome APIs with mock cookie data. Select a site and test the extension UI.
+        </p>
+
+        <label>Mock Website</label>
+        <select id="mockSite">
+            <option value="www.linkedin.com">LinkedIn (12 cookies)</option>
+            <option value="www.facebook.com">Facebook (6 cookies)</option>
+            <option value="www.google.com">Google (7 cookies)</option>
+            <option value="example.com">Example.com (3 cookies)</option>
+        </select>
+
+        <button id="btnApplySite">Apply & Reload</button>
+
+        <label style="margin-top: 20px;">Automated Tests</label>
+        <button id="btnRunTests">Run All Tests</button>
+
+        <div class="test-log" id="testLog">
+            <div class="info">Ready. Select a site and click "Apply & Reload" to begin.</div>
+        </div>
+    </div>
+
+    <!-- Extension Popup in iframe -->
+    <div class="popup-frame">
+        <h3>Extension Popup Preview</h3>
+        <div class="subtitle">Simulating: <strong id="currentMockSite">www.linkedin.com</strong></div>
+        <div class="popup-container">
+            <iframe id="popupFrame" src="test-popup.html"></iframe>
+        </div>
+    </div>
+
+    <script>
+        function getPopupDoc() {
+            return document.getElementById('popupFrame').contentDocument;
+        }
+
+        function getPopupWin() {
+            return document.getElementById('popupFrame').contentWindow;
+        }
+
+        function applySite() {
+            const site = document.getElementById('mockSite').value;
+            document.getElementById('currentMockSite').textContent = site;
+            log('info', `Switching to ${site}...`);
+            // Reload iframe with the mock site param
+            const frame = document.getElementById('popupFrame');
+            frame.src = `test-popup.html?site=${encodeURIComponent(site)}`;
+            frame.onload = function() {
+                log('pass', `Loaded ${site} mock`);
+            };
+        }
+
+        function log(type, message) {
+            const logEl = document.getElementById('testLog');
+            const line = document.createElement('div');
+            line.className = type;
+            const prefix = type === 'pass' ? 'PASS' : type === 'fail' ? 'FAIL' : 'INFO';
+            line.textContent = `[${prefix}] ${message}`;
+            logEl.appendChild(line);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('testLog').innerHTML = '';
+        }
+
+        async function runAllTests() {
+            clearLog();
+            log('info', 'Starting automated test suite...');
+            log('info', '---');
+
+            const doc = getPopupDoc();
+            const win = getPopupWin();
+            let passed = 0;
+            let failed = 0;
+
+            // Test 1: Mock Chrome APIs exist in iframe
+            try {
+                if (win.chrome && win.chrome.cookies && win.chrome.tabs) {
+                    log('pass', 'Chrome APIs are mocked');
+                    passed++;
+                } else {
+                    throw new Error('Chrome APIs not found');
+                }
+            } catch(e) { log('fail', `Chrome APIs: ${e.message}`); failed++; }
+
+            // Test 2: cookies.getAll returns data
+            try {
+                const all = await win.chrome.cookies.getAll({});
+                if (all.length > 0) {
+                    log('pass', `getAll({}) returned ${all.length} cookies`);
+                    passed++;
+                } else {
+                    throw new Error('No cookies returned');
+                }
+            } catch(e) { log('fail', `getAll: ${e.message}`); failed++; }
+
+            // Test 3: Domain filtering works
+            try {
+                const linkedin = await win.chrome.cookies.getAll({ domain: 'www.linkedin.com' });
+                if (linkedin.length > 0) {
+                    log('pass', `Domain filter: ${linkedin.length} LinkedIn cookies`);
+                    passed++;
+                } else {
+                    throw new Error('No LinkedIn cookies returned');
+                }
+            } catch(e) { log('fail', `Domain filter: ${e.message}`); failed++; }
+
+            // Test 4: Parent domain filtering (.linkedin.com)
+            try {
+                const parent = await win.chrome.cookies.getAll({ domain: '.linkedin.com' });
+                if (parent.length > 0) {
+                    log('pass', `Parent domain filter: ${parent.length} cookies for .linkedin.com`);
+                    passed++;
+                } else {
+                    throw new Error('No parent domain cookies');
+                }
+            } catch(e) { log('fail', `Parent domain: ${e.message}`); failed++; }
+
+            // Test 5: Auth cookie detection
+            try {
+                const allCookies = await win.chrome.cookies.getAll({});
+                const authPatterns = ['auth', 'session', 'token', 'login', 'user', 'csrf', 'xsrf',
+                    'li_at', 'c_user', 'xs', 'fr', 'sb', 'datr', 'auth_token', 'twid', 'ct0',
+                    'sessionid', 'csrftoken', 'SID', 'HSID', 'SSID', 'APISID', 'SAPISID',
+                    'JSESSIONID', 'PHPSESSID', 'ASP.NET_SessionId'];
+                const authCookies = allCookies.filter(c =>
+                    authPatterns.some(p => c.name.toLowerCase().includes(p.toLowerCase()))
+                );
+                if (authCookies.length > 0) {
+                    log('pass', `Auth detection: ${authCookies.length} auth cookies identified`);
+                    passed++;
+                } else {
+                    throw new Error('No auth cookies detected');
+                }
+            } catch(e) { log('fail', `Auth detection: ${e.message}`); failed++; }
+
+            // Test 6: Session vs persistent distinction
+            try {
+                const allCookies = await win.chrome.cookies.getAll({});
+                const sessions = allCookies.filter(c => !c.expirationDate);
+                const persistent = allCookies.filter(c => c.expirationDate);
+                if (sessions.length > 0 && persistent.length > 0) {
+                    log('pass', `Session/persistent: ${sessions.length} session, ${persistent.length} persistent`);
+                    passed++;
+                } else {
+                    throw new Error(`Session: ${sessions.length}, Persistent: ${persistent.length}`);
+                }
+            } catch(e) { log('fail', `Session/persistent: ${e.message}`); failed++; }
+
+            // Test 7: Cookie flags present
+            try {
+                const allCookies = await win.chrome.cookies.getAll({});
+                const hasSecure = allCookies.some(c => c.secure === true);
+                const hasHttpOnly = allCookies.some(c => c.httpOnly === true);
+                const hasSameSite = allCookies.some(c => c.sameSite);
+                if (hasSecure && hasHttpOnly && hasSameSite) {
+                    log('pass', 'Cookie flags: secure, httpOnly, sameSite all present');
+                    passed++;
+                } else {
+                    throw new Error('Missing cookie flags');
+                }
+            } catch(e) { log('fail', `Cookie flags: ${e.message}`); failed++; }
+
+            // Test 8: UI elements exist in popup
+            try {
+                const loadBtn = doc.getElementById('loadCookiesBtn');
+                const extractAllBtn = doc.getElementById('extractAllBtn');
+                const output = doc.getElementById('output');
+                if (loadBtn && extractAllBtn && output) {
+                    log('pass', 'UI elements: Load, Extract All, Output all present');
+                    passed++;
+                } else {
+                    throw new Error('Missing UI elements');
+                }
+            } catch(e) { log('fail', `UI elements: ${e.message}`); failed++; }
+
+            // Test 9: Load cookies button works
+            try {
+                doc.getElementById('loadCookiesBtn').click();
+                await new Promise(r => setTimeout(r, 500));
+                const cookieList = doc.getElementById('cookieList');
+                if (cookieList && cookieList.children.length > 0) {
+                    log('pass', `Load cookies: ${cookieList.children.length} cookies rendered`);
+                    passed++;
+                } else {
+                    throw new Error('Cookie list empty after clicking Load');
+                }
+            } catch(e) { log('fail', `Load cookies: ${e.message}`); failed++; }
+
+            // Test 10: Select All / None toggles work
+            try {
+                doc.getElementById('selectAllBtn').click();
+                await new Promise(r => setTimeout(r, 100));
+                const allChecked = doc.querySelectorAll('.cookie-checkbox:checked').length;
+
+                doc.getElementById('selectNoneBtn').click();
+                await new Promise(r => setTimeout(r, 100));
+                const noneChecked = doc.querySelectorAll('.cookie-checkbox:checked').length;
+
+                if (allChecked > 0 && noneChecked === 0) {
+                    log('pass', `Select All/None: All=${allChecked}, None=${noneChecked}`);
+                    passed++;
+                } else {
+                    throw new Error(`All=${allChecked}, None=${noneChecked}`);
+                }
+            } catch(e) { log('fail', `Select All/None: ${e.message}`); failed++; }
+
+            // Test 11: Extract selected produces valid JSON
+            try {
+                doc.getElementById('selectAllBtn').click();
+                await new Promise(r => setTimeout(r, 100));
+                doc.getElementById('extractSelectedBtn').click();
+                await new Promise(r => setTimeout(r, 200));
+                const output = doc.getElementById('output');
+                const data = JSON.parse(output.value);
+                if (data.cookies && data.cookies.length > 0 && data.extractionType === 'selected_cookies') {
+                    log('pass', `Extract selected: ${data.cookies.length} cookies, valid JSON`);
+                    passed++;
+                } else {
+                    throw new Error('Invalid extraction output');
+                }
+            } catch(e) { log('fail', `Extract selected: ${e.message}`); failed++; }
+
+            // Test 12: Extract All Sites works
+            try {
+                doc.getElementById('extractAllBtn').click();
+                await new Promise(r => setTimeout(r, 500));
+                const output = doc.getElementById('output');
+                const data = JSON.parse(output.value);
+                if (data.extractionType === 'all_sites' && data.totalCookies > 0 && data.domainCount > 1) {
+                    log('pass', `Extract all: ${data.totalCookies} cookies from ${data.domainCount} domains`);
+                    passed++;
+                } else {
+                    throw new Error('Invalid all-sites extraction');
+                }
+            } catch(e) { log('fail', `Extract all: ${e.message}`); failed++; }
+
+            log('info', '---');
+            const total = passed + failed;
+            log(failed === 0 ? 'pass' : 'fail', `Results: ${passed}/${total} passed, ${failed} failed`);
+        }
+
+        document.getElementById('btnApplySite').addEventListener('click', applySite);
+        document.getElementById('btnRunTests').addEventListener('click', runAllTests);
+    </script>
+</body>
+</html>

@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {
+            width: 400px;
+            height: 600px;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        .header {
+            text-align: center;
+            color: #0a66c2;
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            text-align: center;
+        }
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #0a66c2;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+            margin: 10px 0;
+        }
+        button:hover {
+            background-color: #004182;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        textarea {
+            width: 100%;
+            height: 150px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            resize: vertical;
+        }
+        .instructions {
+            font-size: 12px;
+            color: #666;
+            margin: 10px 0;
+        }
+        .cookie-selector {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 10px 0;
+            display: none;
+        }
+        .cookie-item {
+            display: flex;
+            align-items: center;
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .cookie-item:last-child {
+            border-bottom: none;
+        }
+        .cookie-checkbox {
+            margin-right: 10px;
+        }
+        .cookie-info {
+            flex: 1;
+            font-size: 12px;
+        }
+        .cookie-name {
+            font-weight: bold;
+            color: #0a66c2;
+        }
+        .cookie-domain {
+            color: #666;
+            font-size: 10px;
+        }
+        .cookie-flags {
+            color: #999;
+            font-size: 10px;
+        }
+        .filter-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            margin-bottom: 10px;
+            font-size: 12px;
+        }
+        .select-controls {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+        }
+        .select-controls button {
+            padding: 5px 10px;
+            font-size: 11px;
+            width: auto;
+            margin: 0 2px;
+        }
+    </style>
+</head>
+<body>
+    <h2 class="header">Universal Cookie Extractor</h2>
+
+    <div id="currentSite" class="status info">
+        Detecting current website...
+    </div>
+
+    <div id="status" class="status info">
+        Ready to extract cookies
+    </div>
+
+    <div class="instructions">
+        <strong>Instructions:</strong><br>
+        1. Navigate to any website<br>
+        2. Login/authenticate as needed<br>
+        3. Click "Extract Cookies" below<br>
+        4. Copy the JSON output to share
+    </div>
+
+    <button id="loadCookiesBtn">Load & Select Cookies</button>
+    <button id="extractAllBtn">Extract All Cookies (All Sites)</button>
+
+    <div id="cookieSelector" class="cookie-selector">
+        <input type="text" id="filterInput" class="filter-input" placeholder="Filter cookies by name...">
+        <div class="select-controls">
+            <button id="selectAllBtn">All</button>
+            <button id="selectAuthBtn">Auth</button>
+            <button id="selectSessionBtn">Session</button>
+            <button id="selectNoneBtn">None</button>
+        </div>
+        <div id="cookieList"></div>
+        <button id="extractSelectedBtn">Extract Selected Cookies</button>
+    </div>
+
+    <button id="copyBtn" style="display: none;">Copy to Clipboard</button>
+    <button id="clearBtn" style="display: none;">Clear</button>
+
+    <textarea id="output" placeholder="Cookie data will appear here..." readonly style="display: none;"></textarea>
+
+    <!-- Mock Chrome APIs MUST load before popup.js -->
+    <script src="mock-chrome.js"></script>
+    <script src="../popup.js"></script>
+</body>
+</html>
