@@ -34,11 +34,12 @@
     ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
     ::-webkit-scrollbar-thumb:hover { background: #52525b; }
 
+    .cookie-row { transition: background 0.15s ease; }
     .cookie-row:hover { background: rgba(63, 63, 70, 0.3); }
     .domain-row { transition: background 0.15s ease; }
     .domain-row:hover { background: rgba(63, 63, 70, 0.4); }
 
-    .badge { @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium; }
+    .badge { @apply inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium; }
 
     .expand-icon { transition: transform 0.2s ease; }
     .expanded .expand-icon { transform: rotate(90deg); }
@@ -728,15 +729,7 @@ function renderDomainRow(domainEntry, category, query) {
     const detail = document.createElement('div');
     detail.className = 'ml-6 mr-1 mb-2 border border-zinc-800 rounded-lg overflow-hidden animate-slide-down';
 
-    // Table header
-    let tableHTML = `
-      <div class="grid grid-cols-[1fr_auto_auto_1fr] gap-x-4 px-4 py-2 bg-zinc-900/80 border-b border-zinc-800 text-xs font-medium text-zinc-500 uppercase tracking-wider">
-        <span>Name</span>
-        <span>Flags</span>
-        <span>Expiry</span>
-        <span>Purpose</span>
-      </div>
-    `;
+    let tableHTML = '';
 
     // Sort cookies: known ones first, then alphabetical
     const sortedCookies = [...cookies].sort((a, b) => {
@@ -750,29 +743,35 @@ function renderDomainRow(domainEntry, category, query) {
       const knowledge = lookupCookiePurpose(cookie.name);
       const isMatch = query && cookie.name.toLowerCase().includes(query);
 
-      // Flags
-      const flags = [];
-      if (cookie.secure) flags.push('<span class="badge bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">Secure</span>');
-      if (cookie.httpOnly) flags.push('<span class="badge bg-rose-500/15 text-rose-400 border border-rose-500/20">HttpOnly</span>');
+      // Flags - compact dots/icons style
+      const flagParts = [];
+      if (cookie.secure) flagParts.push('<span class="badge bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">Secure</span>');
+      if (cookie.httpOnly) flagParts.push('<span class="badge bg-rose-500/15 text-rose-400 border border-rose-500/20">HttpOnly</span>');
       if (cookie.session) {
-        flags.push('<span class="badge bg-amber-500/15 text-amber-400 border border-amber-500/20">Session</span>');
+        flagParts.push('<span class="badge bg-amber-500/15 text-amber-400 border border-amber-500/20">Session</span>');
       } else {
-        flags.push('<span class="badge bg-sky-500/15 text-sky-400 border border-sky-500/20">Persistent</span>');
+        flagParts.push('<span class="badge bg-sky-500/15 text-sky-400 border border-sky-500/20">Persistent</span>');
       }
-      if (cookie.sameSite && cookie.sameSite !== 'unspecified') {
-        flags.push(`<span class="badge bg-zinc-500/15 text-zinc-400 border border-zinc-600/30">${escapeHtml(cookie.sameSite)}</span>`);
+      const sameSite = cookie.sameSite;
+      if (sameSite && sameSite !== 'unspecified') {
+        const sameSiteLabel = sameSite === 'no_restriction' ? 'None' : sameSite.charAt(0).toUpperCase() + sameSite.slice(1);
+        flagParts.push(`<span class="badge bg-zinc-500/15 text-zinc-500 border border-zinc-700/40">${sameSiteLabel}</span>`);
       }
 
       // Expiry
       let expiry = 'Session';
+      let expiryColor = 'text-amber-400/70';
       if (cookie.expirationDate) {
         const exp = new Date(cookie.expirationDate * 1000);
         const now = new Date();
         const diffDays = Math.round((exp - now) / 86400000);
+        expiryColor = 'text-zinc-500';
         if (diffDays < 0) {
-          expiry = `<span class="text-red-400">Expired</span>`;
+          expiry = 'Expired';
+          expiryColor = 'text-red-400';
         } else if (diffDays === 0) {
           expiry = 'Today';
+          expiryColor = 'text-amber-400';
         } else if (diffDays === 1) {
           expiry = 'Tomorrow';
         } else if (diffDays < 30) {
@@ -784,29 +783,24 @@ function renderDomainRow(domainEntry, category, query) {
         }
       }
 
-      // Truncated value
-      const truncVal = cookie.value && cookie.value.length > 20
-        ? cookie.value.substring(0, 20) + '...'
-        : cookie.value || '';
-
       // Purpose
       const purposeHTML = knowledge
-        ? `<span class="text-zinc-300">${escapeHtml(knowledge.purpose)}</span>`
-        : `<span class="text-zinc-600 italic">Unknown</span>`;
+        ? `<span class="text-zinc-400">${escapeHtml(knowledge.purpose)}</span>`
+        : `<span class="text-zinc-600 italic">Unknown purpose</span>`;
 
       // Purpose category badge
       const purposeCatBadge = knowledge ? getCategoryBadge(knowledge.category) : '';
 
       tableHTML += `
-        <div class="cookie-row grid grid-cols-[1fr_auto_auto_1fr] gap-x-4 items-start px-4 py-2.5 border-b border-zinc-800/50 last:border-b-0 ${isMatch ? 'bg-amber-500/5' : ''}">
-          <div class="min-w-0">
-            <div class="font-mono text-sm font-medium ${isMatch ? 'text-amber-300' : 'text-zinc-200'} truncate" title="${escapeHtml(cookie.name)}">${escapeHtml(cookie.name)}</div>
-            <div class="font-mono text-xs text-zinc-600 truncate mt-0.5" title="${escapeHtml(cookie.value || '')}">${escapeHtml(truncVal)}</div>
+        <div class="cookie-row px-4 py-3 border-b border-zinc-800/40 last:border-b-0 ${isMatch ? 'bg-amber-500/5' : ''}">
+          <div class="flex items-baseline justify-between gap-4 mb-1.5">
+            <span class="font-mono text-[13px] font-semibold ${isMatch ? 'text-amber-300' : 'text-zinc-100'} break-all leading-snug">${escapeHtml(cookie.name)}</span>
+            <span class="${expiryColor} text-xs font-medium tabular-nums whitespace-nowrap flex-shrink-0">${expiry}</span>
           </div>
-          <div class="flex flex-wrap gap-1 max-w-xs">${flags.join('')}</div>
-          <div class="text-xs text-zinc-400 whitespace-nowrap tabular-nums">${expiry}</div>
-          <div class="text-xs leading-relaxed min-w-0">
-            <span class="flex items-center gap-1.5 flex-wrap">${purposeCatBadge}${purposeHTML}</span>
+          <div class="flex items-center gap-2 flex-wrap">
+            <div class="flex items-center gap-1 flex-wrap">${flagParts.join('')}</div>
+            <span class="text-zinc-700">|</span>
+            <div class="flex items-center gap-1.5 min-w-0">${purposeCatBadge}${purposeHTML}</div>
           </div>
         </div>
       `;
@@ -832,7 +826,7 @@ function getCategoryBadge(cat) {
   };
   const color = badgeColors[cat] || 'bg-zinc-500/15 text-zinc-400 border-zinc-600/30';
   const label = cat.charAt(0).toUpperCase() + cat.slice(1);
-  return `<span class="badge ${color} border text-[10px]">${label}</span>`;
+  return `<span class="badge ${color} border">${label}</span>`;
 }
 
 // ============================================================
