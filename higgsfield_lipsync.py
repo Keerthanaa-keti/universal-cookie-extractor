@@ -259,25 +259,26 @@ class HiggsFieldAPI:
         if not path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
 
-        ext = path.suffix.lower()
-        mimetype_map = {
-            ".mp3": "audio/mpeg", ".wav": "audio/wav",
-            ".m4a": "audio/mp4", ".ogg": "audio/ogg",
-            ".webm": "audio/webm", ".flac": "audio/flac",
+        ext = path.suffix.lower().lstrip(".")
+        name = path.stem
+        content_type_map = {
+            "mp3": "audio/mpeg", "wav": "audio/wav",
+            "m4a": "audio/mp4", "ogg": "audio/ogg",
+            "webm": "audio/webm", "flac": "audio/flac",
         }
-        mimetype = mimetype_map.get(ext, "audio/mpeg")
 
-        print(f"  [1/3] Creating presigned URL for {path.name} ({mimetype})...")
+        print(f"  [1/3] Creating presigned URL for {path.name}...")
         self._update_auth()
         resp = self.session.post(
             self._url("/audio"),
-            json={"mimetype": mimetype},
+            json={"name": name, "extension": ext},
         )
         resp.raise_for_status()
         media_info = resp.json()
         media_id = media_info["id"]
         upload_url = media_info["upload_url"]
-        content_type = media_info.get("content_type", mimetype)
+        fallback_ct = content_type_map.get(ext, "audio/mpeg")
+        content_type = media_info.get("content_type", fallback_ct)
         media_url = media_info["url"]
 
         print(f"  [2/3] Uploading {path.name} ({path.stat().st_size / 1024 / 1024:.1f} MB)...")
