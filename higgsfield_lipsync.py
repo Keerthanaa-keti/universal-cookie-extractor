@@ -398,15 +398,25 @@ class HiggsFieldAPI:
         return response_data.get("id") or response_data.get("job_set_id")
 
     def generate_tts(self, script: str, voice_id: str = DEFAULT_VOICE_ID,
-                     sound_id: str = "") -> dict:
-        """Generate TTS audio. Returns completed job with audio URLs."""
+                     voice_clone_id: str = "", sound_id: str = "") -> dict:
+        """Generate TTS audio. Returns completed job with audio URLs.
+
+        Args:
+            voice_id: Stock voice ID (e.g. "6pBuGbellIksHKibt0je2n" for Marston).
+                      Ignored if voice_clone_id is provided.
+            voice_clone_id: Cloned voice ID from clone-voice command.
+                            When set, voice_id is cleared (API requires one or the other).
+        """
         params = {
-            "voice_id": voice_id,
+            "voice_id": voice_id if not voice_clone_id else "",
             "sound_id": sound_id,
             "prompt": script,
             **TTS_PARAMS,
         }
-        print(f"  Submitting TTS job (voice: {voice_id})...")
+        if voice_clone_id:
+            params["voice_clone_id"] = voice_clone_id
+        label = voice_clone_id or voice_id
+        print(f"  Submitting TTS job (voice: {label})...")
         self._update_auth()
         resp = self.session.post(
             self._url("/jobs/text2speech"),
@@ -579,6 +589,7 @@ def extract_result_url(job: dict, media_type: str = "video") -> str:
 
 def run_pipeline(video_path: str, name: str, token_manager: ClerkTokenManager,
                  script: str = None, voice_id: str = DEFAULT_VOICE_ID,
+                 voice_clone_id: str = "",
                  output_dir: str = "output", skip_tts: bool = False,
                  audio_url: str = None, video_url: str = None):
     """Run the full lipsync pipeline."""
@@ -637,7 +648,8 @@ def run_pipeline(video_path: str, name: str, token_manager: ClerkTokenManager,
         audio_input = None
     else:
         print(f"\n=== Step 2: Generate TTS audio ===")
-        tts_job = api.generate_tts(personalized_script, voice_id)
+        tts_job = api.generate_tts(personalized_script, voice_id,
+                                   voice_clone_id=voice_clone_id)
         tts_audio_url = extract_result_url(tts_job, "audio")
         tts_job_id = tts_job.get("id")
         print(f"  TTS audio: {tts_audio_url[:80]}...")
@@ -695,7 +707,8 @@ def main():
     video_group.add_argument("--video-url", help="URL of video already on CDN (skips upload)")
     run_parser.add_argument("--name", required=True, help="Recipient name (replaces placeholder)")
     run_parser.add_argument("--script", help="Custom script (use {name} as placeholder)")
-    run_parser.add_argument("--voice-id", default=DEFAULT_VOICE_ID, help="TTS voice ID")
+    run_parser.add_argument("--voice-id", default=DEFAULT_VOICE_ID, help="TTS stock voice ID")
+    run_parser.add_argument("--voice-clone-id", default="", help="Cloned voice ID (from clone-voice command)")
     run_parser.add_argument("--audio-url", help="Pre-generated audio URL (skips TTS)")
     run_parser.add_argument("--output-dir", default="output", help="Output directory")
     add_auth_args(run_parser)
@@ -744,6 +757,7 @@ def main():
             token_manager=token_manager,
             script=args.script,
             voice_id=args.voice_id,
+            voice_clone_id=args.voice_clone_id,
             output_dir=args.output_dir,
             audio_url=args.audio_url,
             video_url=args.video_url,
