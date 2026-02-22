@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Universal Cookie Extractor",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "description": "Auto-extracts cookies from all sites, accessible to Claude in Chrome via DOM injection",
   "permissions": [
     "cookies",
