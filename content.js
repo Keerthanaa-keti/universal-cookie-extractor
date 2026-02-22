@@ -61,3 +61,40 @@ document.addEventListener('__cookie_extractor_refresh__', () => {
     });
   });
 });
+
+// File upload bridge - allows Claude in Chrome to inject files into file inputs
+// bypassing page CSP restrictions by using the extension's host_permissions
+window.addEventListener('message', async (event) => {
+  if (event.source !== window) return;
+  if (!event.data || event.data.type !== '__cookie_extractor_upload_file__') return;
+
+  const { url, inputSelector, fileName, mimeType } = event.data;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
+
+    const blob = await response.blob();
+    const file = new File([blob], fileName, { type: mimeType });
+    const dt = new DataTransfer();
+    dt.items.add(file);
+
+    const input = document.querySelector(inputSelector);
+    if (!input) throw new Error(`Input not found: ${inputSelector}`);
+
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+
+    window.postMessage({
+      type: '__cookie_extractor_upload_result__',
+      success: true,
+      fileSize: file.size,
+      fileName: file.name
+    }, '*');
+  } catch (err) {
+    window.postMessage({
+      type: '__cookie_extractor_upload_result__',
+      success: false,
+      error: err.message
+    }, '*');
+  }
+});
