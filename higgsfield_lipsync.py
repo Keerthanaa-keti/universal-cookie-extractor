@@ -24,6 +24,15 @@ Usage:
 
   python higgsfield_lipsync.py voices --token "eyJhb..."
   python higgsfield_lipsync.py status --job-id "abc-123" --token "eyJhb..."
+
+  # Voice cloning
+  python higgsfield_lipsync.py clone-voice \
+    --sample voice-sample.mp3 \
+    --name "Kishore" \
+    --client-cookie-file /tmp/higgsfield_client_cookie.txt
+
+  python higgsfield_lipsync.py list-clones \
+    --client-cookie-file /tmp/higgsfield_client_cookie.txt
 """
 
 import argparse
@@ -242,6 +251,130 @@ class HiggsFieldAPI:
 
         print(f"  Upload complete: {media_url[:80]}...")
         return {"id": media_id, "url": media_url, "type": "video_input"}
+
+    def upload_audio(self, file_path: str) -> dict:
+        """Upload an audio file via POST /audio → PUT → POST /audio/{id}/upload.
+        Returns {id, url, type: "audio_input"}."""
+        path = Path(file_path)
+        if not path.exists():
+            raise FileNotFoundError(f"File not found: {file_path}")
+
+        ext = path.suffix.lower()
+        mimetype_map = {
+            ".mp3": "audio/mpeg", ".wav": "audio/wav",
+            ".m4a": "audio/mp4", ".ogg": "audio/ogg",
+            ".webm": "audio/webm", ".flac": "audio/flac",
+        }
+        mimetype = mimetype_map.get(ext, "audio/mpeg")
+
+        print(f"  [1/3] Creating presigned URL for {path.name} ({mimetype})...")
+        self._update_auth()
+        resp = self.session.post(
+            self._url("/audio"),
+            json={"mimetype": mimetype},
+        )
+        resp.raise_for_status()
+        media_info = resp.json()
+        media_id = media_info["id"]
+        upload_url = media_info["upload_url"]
+        content_type = media_info.get("content_type", mimetype)
+        media_url = media_info["url"]
+
+        print(f"  [2/3] Uploading {path.name} ({path.stat().st_size / 1024 / 1024:.1f} MB)...")
+        with open(file_path, "rb") as f:
+            upload_resp = requests.put(
+                upload_url,
+                data=f,
+                headers={"Content-Type": content_type},
+            )
+            upload_resp.raise_for_status()
+
+        print(f"  [3/3] Confirming upload...")
+        self._update_auth()
+        confirm_resp = self.session.post(self._url(f"/audio/{media_id}/upload"))
+        confirm_resp.raise_for_status()
+
+        print(f"  Upload complete: {media_url[:80]}...")
+        return {"id": media_id, "url": media_url, "type": "audio_input"}
+
+    # ── Voice Cloning ────────────────────────────────────────────────────
+
+    def get_voice_clones(self) -> list:
+        """List all voice clones (built-in + user-created)."""
+        self._update_auth()
+        resp = self.session.get(self._url("/voice-clone"))
+        resp.raise_for_status()
+        data = resp.json()
+        # API returns paginated: {items: [...], has_more: bool}
+        if isinstance(data, dict) and "items" in data:
+            return data["items"]
+        return data
+
+    def clone_voice(self, audio_inputs: list, name: str = None) -> dict:
+        """Create a voice clone from audio samples.
+
+        Args:
+            audio_inputs: List of {id, url, type: "audio_input"} dicts
+            name: Optional name for the clone
+
+        Returns:
+            Voice clone object with id, status, etc.
+        """
+        payload = {"input_audios": audio_inputs}
+        if name:
+            payload["name"] = name
+
+        print(f"  Submitting voice clone request ({len(audio_inputs)} audio sample(s))...")
+        self._update_auth()
+        resp = self.session.post(
+            self._url("/voice-clone"),
+            json=payload,
+        )
+        if resp.status_code >= 400:
+            print(f"  ERROR {resp.status_code}: {resp.text[:500]}")
+        resp.raise_for_status()
+        clone = resp.json()
+        clone_id = clone.get("id", "unknown")
+        status = clone.get("status", "unknown")
+        print(f"  Voice clone created: {clone_id} (status: {status})")
+        return clone
+
+    def poll_voice_clone(self, clone_id: str, poll_interval: int = 5,
+                         max_wait: int = 300) -> dict:
+        """Poll voice clone until ready."""
+        start_time = time.time()
+        last_status = None
+
+        while True:
+            elapsed = time.time() - start_time
+            if elapsed > max_wait:
+                raise TimeoutError(
+                    f"Voice clone {clone_id} timed out after {max_wait}s"
+                )
+
+            self._update_auth()
+            clones = self.get_voice_clones()
+            clone = None
+            for c in clones:
+                if c.get("id") == clone_id:
+                    clone = c
+                    break
+
+            if not clone:
+                raise RuntimeError(f"Voice clone {clone_id} not found")
+
+            status = clone.get("status", "unknown")
+            if status != last_status:
+                print(f"  Clone {clone_id[:8]}... status: {status} "
+                      f"({elapsed:.0f}s elapsed)")
+                last_status = status
+
+            if status == "ready":
+                return clone
+            elif status in ("failed", "error"):
+                raise RuntimeError(f"Voice clone {clone_id} failed: {clone}")
+
+            time.sleep(poll_interval)
 
     # ── TTS ─────────────────────────────────────────────────────────────
 
@@ -575,6 +708,21 @@ def main():
     status_parser.add_argument("--job-id", required=True, help="Job ID to check")
     add_auth_args(status_parser)
 
+    # clone-voice command
+    clone_parser = subparsers.add_parser("clone-voice", help="Clone a voice from audio sample(s)")
+    clone_parser.add_argument("--sample", required=True, nargs="+",
+                              help="Path(s) to audio sample file(s) (mp3/wav/m4a)")
+    clone_parser.add_argument("--name", help="Name for the cloned voice")
+    clone_parser.add_argument("--wait", action="store_true", default=True,
+                              help="Wait for clone to be ready (default: true)")
+    clone_parser.add_argument("--no-wait", dest="wait", action="store_false",
+                              help="Don't wait for clone to finish processing")
+    add_auth_args(clone_parser)
+
+    # list-clones command
+    clones_parser = subparsers.add_parser("list-clones", help="List voice clones")
+    add_auth_args(clones_parser)
+
     # credits command
     credits_parser = subparsers.add_parser("credits", help="Check credit balance")
     add_auth_args(credits_parser)
@@ -628,6 +776,45 @@ def main():
                 print(f"\nResult URL: {url}")
             except ValueError:
                 print("\nNo result URL found")
+
+    elif args.command == "clone-voice":
+        api = HiggsFieldAPI(token_manager)
+
+        # Upload each audio sample
+        audio_inputs = []
+        for sample_path in args.sample:
+            print(f"\n--- Uploading audio sample: {sample_path} ---")
+            audio_obj = api.upload_audio(sample_path)
+            audio_inputs.append(audio_obj)
+
+        # Submit voice clone
+        print(f"\n--- Creating voice clone ---")
+        clone = api.clone_voice(audio_inputs, name=args.name)
+        clone_id = clone.get("id")
+
+        if args.wait and clone.get("status") != "ready":
+            print(f"\n--- Waiting for clone to be ready ---")
+            clone = api.poll_voice_clone(clone_id)
+
+        print(f"\n=== Voice Clone Result ===")
+        print(f"  ID:     {clone.get('id')}")
+        print(f"  Name:   {clone.get('name', 'unnamed')}")
+        print(f"  Status: {clone.get('status')}")
+        print(f"\n  Use this voice with: --voice-id {clone.get('id')}")
+
+    elif args.command == "list-clones":
+        api = HiggsFieldAPI(token_manager)
+        clones = api.get_voice_clones()
+        if isinstance(clones, list):
+            print(f"\nVoice clones ({len(clones)}):")
+            for c in clones:
+                cid = c.get("id", "?")
+                cname = c.get("name", "unnamed")
+                status = c.get("status", "?")
+                internal = " (built-in)" if c.get("is_internal") else ""
+                print(f"  {cid}  {cname}  [{status}]{internal}")
+        else:
+            print(json.dumps(clones, indent=2))
 
     elif args.command == "credits":
         api = HiggsFieldAPI(token_manager)
