@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Universal Cookie Extractor",
-  "version": "2.0.7",
-  "description": "Auto-extracts cookies from all sites, accessible to Claude in Chrome via DOM injection",
+  "version": "2.1.0",
+  "description": "Auto-extracts cookies from all sites with encrypted cloud sync via Cookie Vault",
   "permissions": [
     "cookies",
     "storage",
@@ -27,6 +27,7 @@
     "default_popup": "popup.html",
     "default_title": "Universal Cookie Extractor"
   },
+  "options_page": "vault-settings.html",
   "icons": {
     "16": "icon.png",
     "48": "icon.png",

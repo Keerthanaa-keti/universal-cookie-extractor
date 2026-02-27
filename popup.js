@@ -15,9 +15,50 @@ document.addEventListener('DOMContentLoaded', function() {
     const status = document.getElementById('status');
     const currentSite = document.getElementById('currentSite');
 
+    const vaultBar = document.getElementById('vaultBar');
+    const vaultDot = document.getElementById('vaultDot');
+    const vaultStatusText = document.getElementById('vaultStatusText');
+    const vaultSettingsLink = document.getElementById('vaultSettingsLink');
+
     let currentDomain = '';
     let currentUrl = '';
     let availableCookies = [];
+
+    // Load vault status
+    chrome.runtime.sendMessage({ type: 'GET_VAULT_STATUS' }, (status) => {
+        if (chrome.runtime.lastError || !status) return;
+        vaultBar.style.display = 'flex';
+        if (!status.enabled) {
+            vaultDot.className = 'vault-dot off';
+            vaultStatusText.textContent = 'Vault: disabled';
+        } else if (!status.configured) {
+            vaultDot.className = 'vault-dot off';
+            vaultStatusText.textContent = 'Vault: not configured';
+        } else if (status.lastError) {
+            vaultDot.className = 'vault-dot error';
+            vaultStatusText.textContent = 'Vault: error';
+        } else if (status.lastSync) {
+            vaultDot.className = 'vault-dot on';
+            const ago = timeSince(new Date(status.lastSync));
+            vaultStatusText.textContent = `Vault: synced ${ago}`;
+        } else {
+            vaultDot.className = 'vault-dot on';
+            vaultStatusText.textContent = 'Vault: connected';
+        }
+    });
+
+    vaultSettingsLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        chrome.runtime.openOptionsPage();
+    });
+
+    function timeSince(date) {
+        const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+        if (seconds < 60) return 'just now';
+        if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+        if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+        return `${Math.floor(seconds / 86400)}d ago`;
+    }
 
     function showStatus(message, type = 'info') {
         status.textContent = message;

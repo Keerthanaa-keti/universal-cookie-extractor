@@ -124,6 +124,36 @@
             width: auto;
             margin: 0 2px;
         }
+        .vault-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: #f0f4f8;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-size: 12px;
+        }
+        .vault-bar .vault-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .vault-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        .vault-dot.on { background: #22c55e; }
+        .vault-dot.off { background: #94a3b8; }
+        .vault-dot.error { background: #ef4444; }
+        .vault-bar a {
+            color: #0a66c2;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .vault-bar a:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -133,6 +163,14 @@
         Detecting current website...
     </div>
     
+    <div id="vaultBar" class="vault-bar" style="display: none;">
+        <div class="vault-status">
+            <span id="vaultDot" class="vault-dot off"></span>
+            <span id="vaultStatusText">Vault: disabled</span>
+        </div>
+        <a href="#" id="vaultSettingsLink">Settings</a>
+    </div>
+
     <div id="status" class="status info">
         Ready to extract cookies
     </div>

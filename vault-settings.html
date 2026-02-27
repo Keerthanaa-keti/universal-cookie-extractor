@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Cookie Vault Settings</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+    .container {
+      max-width: 640px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: #f8fafc;
+    }
+    .subtitle {
+      color: #94a3b8;
+      font-size: 14px;
+      margin-bottom: 32px;
+    }
+    .section {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .section-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #f8fafc;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .field {
+      margin-bottom: 16px;
+    }
+    .field:last-child { margin-bottom: 0; }
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: #94a3b8;
+      margin-bottom: 6px;
+    }
+    input[type="text"],
+    input[type="password"],
+    input[type="email"],
+    input[type="number"],
+    select,
+    textarea {
+      width: 100%;
+      padding: 10px 12px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      color: #e2e8f0;
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: #3b82f6;
+    }
+    textarea { resize: vertical; min-height: 80px; font-family: monospace; font-size: 12px; }
+    .toggle-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+    }
+    .toggle-label {
+      font-size: 14px;
+      font-weight: 500;
+      color: #f8fafc;
+    }
+    .toggle-desc {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 2px;
+    }
+    .toggle {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute;
+      inset: 0;
+      background: #334155;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      left: 3px;
+      top: 3px;
+      background: #e2e8f0;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    .toggle input:checked + .toggle-slider {
+      background: #3b82f6;
+    }
+    .toggle input:checked + .toggle-slider::before {
+      transform: translateX(20px);
+    }
+    .help-text {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 4px;
+    }
+    .btn-row {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: #3b82f6;
+      color: white;
+      flex: 1;
+    }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-secondary {
+      background: #334155;
+      color: #e2e8f0;
+    }
+    .btn-secondary:hover { background: #475569; }
+    .btn-danger {
+      background: #991b1b;
+      color: #fecaca;
+    }
+    .btn-danger:hover { background: #b91c1c; }
+    .status-bar {
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 20px;
+      display: none;
+    }
+    .status-bar.success { display: block; background: #064e3b; color: #6ee7b7; border: 1px solid #065f46; }
+    .status-bar.error { display: block; background: #7f1d1d; color: #fca5a5; border: 1px solid #991b1b; }
+    .status-bar.info { display: block; background: #1e3a5f; color: #93c5fd; border: 1px solid #1e40af; }
+    .sync-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: #0f172a;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #94a3b8;
+    }
+    .sync-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .sync-dot.connected { background: #22c55e; }
+    .sync-dot.disconnected { background: #ef4444; }
+    .sync-dot.disabled { background: #64748b; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Cookie Vault Settings</h1>
+    <p class="subtitle">Encrypted cloud sync for your browser cookies</p>
+
+    <div id="statusBar" class="status-bar"></div>
+
+    <!-- Connection Status -->
+    <div class="section">
+      <div class="section-title">Connection Status</div>
+      <div class="sync-status">
+        <span id="syncDot" class="sync-dot disabled"></span>
+        <span id="syncStatusText">Not configured</span>
+      </div>
+    </div>
+
+    <!-- Enable/Disable -->
+    <div class="section">
+      <div class="section-title">Vault Sync</div>
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Enable Cloud Sync</div>
+          <div class="toggle-desc">Encrypted cookies synced to Supabase</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="vaultEnabled">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Supabase Config -->
+    <div class="section">
+      <div class="section-title">Supabase Connection</div>
+      <div class="field">
+        <label for="supabaseUrl">Supabase URL</label>
+        <input type="text" id="supabaseUrl" placeholder="https://your-project.supabase.co">
+      </div>
+      <div class="field">
+        <label for="supabaseAnonKey">Anon Key</label>
+        <input type="password" id="supabaseAnonKey" placeholder="eyJhbG...">
+        <div class="help-text">Public anon key from Supabase project settings</div>
+      </div>
+    </div>
+
+    <!-- Auth -->
+    <div class="section">
+      <div class="section-title">Authentication</div>
+      <div class="field">
+        <label for="vaultEmail">Email</label>
+        <input type="email" id="vaultEmail" placeholder="you@example.com">
+      </div>
+      <div class="field">
+        <label for="vaultPassword">Password</label>
+        <input type="password" id="vaultPassword" placeholder="Supabase auth password">
+        <div class="help-text">Stored locally only, never synced to cloud</div>
+      </div>
+    </div>
+
+    <!-- Encryption -->
+    <div class="section">
+      <div class="section-title">Encryption</div>
+      <div class="field">
+        <label for="vaultKey">Vault Key (COOKIE_VAULT_KEY)</label>
+        <input type="password" id="vaultKey" placeholder="Your encryption passphrase">
+        <div class="help-text">Same key must be used in Python/Node.js clients. Use a strong passphrase.</div>
+      </div>
+    </div>
+
+    <!-- Sync Settings -->
+    <div class="section">
+      <div class="section-title">Sync Settings</div>
+      <div class="field">
+        <label for="syncMode">What to Sync</label>
+        <select id="syncMode">
+          <option value="auth_only">Auth cookies only (recommended)</option>
+          <option value="all">All cookies</option>
+          <option value="selected_domains">Selected domains only</option>
+        </select>
+      </div>
+      <div class="field" id="selectedDomainsField" style="display: none;">
+        <label for="selectedDomains">Domains (one per line)</label>
+        <textarea id="selectedDomains" placeholder=".linkedin.com&#10;.github.com&#10;.google.com"></textarea>
+      </div>
+      <div class="field">
+        <label for="syncInterval">Sync Interval (minutes)</label>
+        <input type="number" id="syncInterval" min="1" max="60" value="5">
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="btn-row">
+      <button class="btn-primary" id="saveBtn">Save Settings</button>
+      <button class="btn-secondary" id="testBtn">Test Connection</button>
+      <button class="btn-secondary" id="syncNowBtn">Sync Now</button>
+    </div>
+  </div>
+
+  <script src="vault-settings.js"></script>
+</body>
+</html>
