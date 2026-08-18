@@ -2,7 +2,12 @@
 
 > Last updated: 2026-08-18
 
-## Status: Active — Cookie Vault v3 built (Phases 0–6), provisioning pending
+## Status: Active — Cookie Vault v3 LIVE (Phases 0–7)
+
+Provisioned + deployed 2026-08-18: project `cookie-vault` (ref `apjfsrnbykcezznjhhdq`,
+us-east-2, HyperVerge free org). Broker deployed. Kiket EC2 (18.190.203.204) reads
+cookies through it (keypair generated on the box). Live values in `~/.cookie-vault/SETUP.txt`.
+Remaining: user configures the Chrome extension so real cookies sync.
 
 Chrome extension for cookie extraction + **Cookie Vault v3** (zero-knowledge,
 per-server scoped cookie access for remote servers) + voice-clone video pipeline.
@@ -26,9 +31,8 @@ every read. See `docs/architecture/ROADMAP.html` and the design spec.
 | `vault-settings.html/js` | Owner console (Connection/Servers/Tokens/Audit) |
 | `test/run_all.sh` | All checks (interop + e2e + full loop): 24 green |
 
-**Next:** Phase 7 — create a new free Supabase project, apply schema, deploy the
-broker, register the first server, issue a token, live e2e. Needs the owner's
-Supabase account.
+**Next:** user loads + configures the Chrome extension (Project URL + anon key + owner
+sign-in + passphrase) so real cookies sync. `test/live/smoke.mjs` re-runs the live e2e.
 
 ## Other entry points
 | Path | Purpose |

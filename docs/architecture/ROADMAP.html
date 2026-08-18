@@ -48,9 +48,9 @@
   <h1>Cookie Vault <span>v3</span> — Roadmap</h1>
   <div class="sub">Zero-knowledge, per-server scoped access to your browser cookies on remote servers</div>
   <div class="pills">
-    <span class="pill ok">Phases 0–6 shipped</span>
-    <span class="pill">24 automated checks green</span>
-    <span class="pill">Chrome 151 verified</span>
+    <span class="pill ok">LIVE — Phases 0–7 shipped</span>
+    <span class="pill">24 tests + 7 live checks green</span>
+    <span class="pill">Kiket EC2 reading</span>
     <span class="pill">Updated 2026-08-18</span>
   </div>
 </header>
@@ -58,7 +58,7 @@
 <h2>TL;DR</h2>
 <div class="card tldr">
   <p>The old vault put your <strong>password and a master decryption key on every server</strong> — one breach meant total account takeover and every cookie exposed. v3 replaces that with a <strong>zero-knowledge, least-privilege</strong> design: each server holds only its own private key and a scoped, revocable token; the database and broker never see cookie plaintext.</p>
-  <div class="rec">Recommendation: ship v3 (done) and provision a new free Supabase project to go live. The code is built, tested end-to-end, and ready — the only remaining step needs your Supabase account.</div>
+  <div class="rec">LIVE as of 2026-08-18. New free Supabase project <code>cookie-vault</code> (us-east-2) created, schema applied, broker deployed, and your Kiket EC2 server is reading cookies through it — decrypting locally with a key that never left the box. One step remains for real data: configure the extension in Chrome so your real cookies sync.</div>
 </div>
 
 <h2>How it fits together</h2>
@@ -118,8 +118,9 @@ flowchart LR
 <table>
   <thead><tr><th>When</th><th>Item</th><th>Unlock</th><th>Status</th></tr></thead>
   <tbody>
-    <tr><td>Now</td><td>Provision new free Supabase project, apply schema, deploy broker</td><td>Go live</td><td><span class="tag t-now">Phase 7</span></td></tr>
-    <tr><td>Now</td><td>Register first server (e.g. Kiket EC2), issue token, e2e read</td><td>First real use</td><td><span class="tag t-now">Phase 7</span></td></tr>
+    <tr><td>Done</td><td>Provisioned free Supabase project, applied schema, deployed broker</td><td>Live infra</td><td><span class="tag t-done">✓ live</span></td></tr>
+    <tr><td>Done</td><td>Kiket EC2 keygen (on box), registered, token issued, live read verified</td><td>First real server</td><td><span class="tag t-done">✓ live</span></td></tr>
+    <tr><td>Now</td><td>Configure the extension in Chrome so your real cookies sync</td><td>Real data flows</td><td><span class="tag t-now">your step</span></td></tr>
     <tr><td>Next</td><td>Load-test rate limiting; scheduled <code>cleanup_expired_cookies()</code></td><td>Hardening</td><td><span class="tag t-next">Later</span></td></tr>
     <tr><td>Next</td><td>Auto-onboard the whole Kiket fleet (scripted keygen + register)</td><td>Scale</td><td><span class="tag t-next">Later</span></td></tr>
     <tr><td>Later</td><td>Token auto-expiry reminders; per-server read quotas</td><td>Ops polish</td><td><span class="tag t-next">Later</span></td></tr>
@@ -127,12 +128,26 @@ flowchart LR
 </table>
 </div>
 
-<h2>Open decisions (for you)</h2>
-<div class="grid">
-  <div class="card"><strong>1. Provisioning</strong><p class="mono" style="margin-top:6px">Create the new Supabase project together now (I drive the CLI/browser), or you create it and hand me the URL + keys?</p></div>
-  <div class="card"><strong>2. First server</strong><p class="mono" style="margin-top:6px">Which box to onboard first — Kiket EC2 (18.190.203.204), the Higgsfield automation host, or a laptop test?</p></div>
-  <div class="card"><strong>3. Default scope</strong><p class="mono" style="margin-top:6px">Starting allowed-domains for the first server (e.g. <code>linkedin.com, higgsfield.ai</code>)?</p></div>
-  <div class="card"><strong>4. Rate limit</strong><p class="mono" style="margin-top:6px">Reads/min per token — default is <code>120</code>. Raise for a busy scraper, lower for tighter control?</p></div>
+<h2>Live now</h2>
+<div class="card">
+<table>
+  <thead><tr><th>Component</th><th>Value</th></tr></thead>
+  <tbody>
+    <tr><td>Project</td><td class="mono">cookie-vault · apjfsrnbykcezznjhhdq · us-east-2 · HyperVerge (free, $0)</td></tr>
+    <tr><td>Broker</td><td class="mono">https://apjfsrnbykcezznjhhdq.supabase.co/functions/v1/cookie-broker</td></tr>
+    <tr><td>Kiket EC2</td><td>key generated on the box · scope <code>linkedin.com, higgsfield.ai</code> · reading + audited</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Your one remaining step</h2>
+<div class="card">
+  <p>The vault currently holds only a test cookie. To sync your <strong>real</strong> cookies, load the extension and configure it:</p>
+  <ol>
+    <li>Load the unpacked extension (<span class="mono">chrome://extensions</span> → Developer mode → Load unpacked → this repo).</li>
+    <li>Options → Connection: paste the Project URL + anon key, sign in with the owner account, set a vault passphrase, enable sync. Values are in <span class="mono">~/.cookie-vault/SETUP.txt</span>.</li>
+    <li>Options → Servers already lists <code>kiket-ec2</code> (or click Rewrap now). Your real cookies then flow to Kiket automatically.</li>
+  </ol>
 </div>
 
 <div class="foot">
