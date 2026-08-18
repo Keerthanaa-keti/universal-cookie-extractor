@@ -20,13 +20,13 @@ access_log, sync_log` with RLS (owner-only) + indexes. Validated against Postgre
 ## 3. Deploy the broker
 ```bash
 supabase functions deploy cookie-broker --no-verify-jwt
-supabase secrets set SUPABASE_URL="https://<ref>.supabase.co" \
-                     SERVICE_ROLE_KEY="<service_role key>"
 ```
-`--no-verify-jwt` because servers authenticate with their own `cvk_` token (checked
-inside the function), not a Supabase JWT. The function uses the service_role key
-server-side to read/write, bypassing RLS. It only ever returns ciphertext + a DEK
-already sealed to the requesting server — it cannot decrypt cookies.
+No secrets to set: `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are auto-injected
+into every Edge Function. `--no-verify-jwt` because servers authenticate with their
+own `cvk_` token (checked inside the function), not a Supabase JWT. The function uses
+the service-role key server-side to read/write, bypassing RLS. It only ever returns
+ciphertext + a DEK already sealed to the requesting server — it cannot decrypt cookies.
+(Optional: `supabase secrets set RATE_LIMIT_PER_MIN=200` to change the default 120.)
 
 ## 4. Owner (extension) config
 In the extension options page → *Connection*: set the Project URL + anon key, sign

@@ -18,8 +18,11 @@
 //   supabase secrets set SUPABASE_URL=... SERVICE_ROLE_KEY=...
 // ============================================================================
 
+// SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are auto-injected into every Supabase
+// Edge Function — no manual secret needed in production. The bare-name fallbacks are
+// for local/e2e runs (Supabase reserves the SUPABASE_ prefix for its own injection).
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_ROLE_KEY = Deno.env.get("SERVICE_ROLE_KEY")!;
+const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SERVICE_ROLE_KEY")!;
 const RATE_LIMIT_PER_MIN = Number(Deno.env.get("RATE_LIMIT_PER_MIN") ?? "120");
 
 const REST = `${SUPABASE_URL}/rest/v1`;
