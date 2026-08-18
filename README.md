@@ -6,6 +6,25 @@
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-blue)](https://developer.chrome.com/docs/extensions/mv3/)
 [![License MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+---
+
+## 🔐 Cookie Vault v3 — zero-knowledge cookie access for remote servers
+
+Use your logged-in browser sessions on any number of remote servers **securely**.
+
+- **Zero-knowledge:** cookies are envelope-encrypted (X25519 → HKDF → AES-256-GCM). Supabase and the broker only ever hold ciphertext sealed to a specific recipient. A database breach reveals nothing.
+- **Per-server scope:** each server gets a token limited to specific domains. A LinkedIn worker can never read your bank cookies.
+- **No secrets on servers:** a server holds only a scoped `cvk_` token and its own X25519 private key — never your password or a master key.
+- **Instant revocation + full audit:** revoke a server or token in one click; every read is logged.
+
+**Docs:** [design + threat model](docs/superpowers/specs/2026-08-18-cookie-vault-v3-design.md) ·
+[server client usage](lib/README.md) · [Supabase setup](supabase/README.md) ·
+[roadmap](docs/architecture/ROADMAP.html)
+
+**Run the tests:** `bash test/run_all.sh` (needs node ≥18, deno, python3 + `cryptography`,`requests`).
+
+---
+
 ## ✨ Features
 
 ### 🎛️ **Selective Cookie Extraction**

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cookie Vault v3 — Roadmap</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  :root{--bg:#0b1220;--panel:#141d2e;--panel2:#1b2740;--line:#26344f;--ink:#e6edf7;--mut:#93a4c0;--dim:#64748b;
+        --accent:#5b9dff;--green:#34d399;--amber:#fbbf24;--red:#f87171;--mono:ui-monospace,SFMono-Regular,Menlo,monospace;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font:15px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:48px 20px}
+  .wrap{max-width:960px;margin:0 auto}
+  header{border-bottom:1px solid var(--line);padding-bottom:20px;margin-bottom:28px}
+  h1{font-size:30px;font-weight:800;letter-spacing:-.02em}
+  h1 span{color:var(--accent)}
+  .sub{color:var(--mut);margin-top:6px}
+  .pills{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap}
+  .pill{font-size:12px;font-weight:600;padding:4px 10px;border-radius:20px;background:var(--panel2);color:var(--mut);border:1px solid var(--line)}
+  .pill.ok{background:#06341f;color:var(--green);border-color:#0c4a2c}
+  h2{font-size:20px;font-weight:700;margin:36px 0 14px;letter-spacing:-.01em}
+  h2::before{content:"";display:inline-block;width:4px;height:18px;background:var(--accent);border-radius:2px;margin-right:10px;vertical-align:-2px}
+  p{color:var(--ink)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;margin:14px 0}
+  .tldr{background:var(--panel);border-left:3px solid var(--accent)}
+  .rec{background:#06341f;border:1px solid #0c4a2c;border-radius:12px;padding:14px 18px;margin-top:14px;color:var(--green);font-weight:600}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:6px}
+  th{text-align:left;color:var(--dim);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em;padding:8px 10px;border-bottom:1px solid var(--line)}
+  td{padding:10px;border-bottom:1px solid #1e2b43;vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  .mono{font-family:var(--mono);font-size:12px;color:var(--mut)}
+  .tag{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700}
+  .t-done{background:#06341f;color:var(--green)} .t-now{background:#3a2c05;color:var(--amber)} .t-next{background:#1e2b43;color:var(--mut)}
+  .yes{color:var(--green);font-weight:700}.no{color:var(--red);font-weight:700}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:680px){.grid{grid-template-columns:1fr}}
+  .mermaid{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;margin:14px 0;overflow-x:auto}
+  code{font-family:var(--mono);font-size:12.5px;background:var(--panel2);padding:1px 6px;border-radius:5px;color:#cfe0ff}
+  ol,ul{margin:8px 0 8px 22px}
+  li{margin:5px 0}
+  .foot{color:var(--dim);font-size:12.5px;margin-top:40px;border-top:1px solid var(--line);padding-top:16px}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Cookie Vault <span>v3</span> — Roadmap</h1>
+  <div class="sub">Zero-knowledge, per-server scoped access to your browser cookies on remote servers</div>
+  <div class="pills">
+    <span class="pill ok">Phases 0–6 shipped</span>
+    <span class="pill">24 automated checks green</span>
+    <span class="pill">Chrome 151 verified</span>
+    <span class="pill">Updated 2026-08-18</span>
+  </div>
+</header>
+
+<h2>TL;DR</h2>
+<div class="card tldr">
+  <p>The old vault put your <strong>password and a master decryption key on every server</strong> — one breach meant total account takeover and every cookie exposed. v3 replaces that with a <strong>zero-knowledge, least-privilege</strong> design: each server holds only its own private key and a scoped, revocable token; the database and broker never see cookie plaintext.</p>
+  <div class="rec">Recommendation: ship v3 (done) and provision a new free Supabase project to go live. The code is built, tested end-to-end, and ready — the only remaining step needs your Supabase account.</div>
+</div>
+
+<h2>How it fits together</h2>
+<div class="mermaid">
+flowchart LR
+  subgraph B["Your Chrome (owner)"]
+    E["Extension writer<br/>gen DEK · AES-GCM<br/>wrap→owner · seal→each server"]
+  end
+  subgraph S["Supabase (sees only ciphertext)"]
+    D[("cookie_entries<br/>entry_keys<br/>server_keys · access_tokens<br/>access_log")]
+    K["cookie-broker<br/>Edge Function"]
+  end
+  subgraph R["Remote server (reader)"]
+    C["client + X25519 private key<br/>+ cvk_ scoped token"]
+  end
+  E -->|"owner auth (RLS)"| D
+  C -->|"cvk_ token"| K
+  K -->|"service role"| D
+  K -->|"ciphertext + sealed DEK"| C
+  C -->|"unseal → decrypt locally"| C
+  classDef z fill:#141d2e,stroke:#26344f,color:#e6edf7;
+  class E,D,K,C z;
+</div>
+<p class="mono">Zero-knowledge: the broker moves only ciphertext + a DEK already sealed to the requesting server. It never decrypts.</p>
+
+<h2>Why v3 (threat model)</h2>
+<div class="card">
+<table>
+  <thead><tr><th>If a server is compromised…</th><th>v2.1.00</th><th>v3</th></tr></thead>
+  <tbody>
+    <tr><td>Reads all cookies, all domains</td><td class="no">yes</td><td class="yes">no — only its scoped domains</td></tr>
+    <tr><td>Takes over the account</td><td class="no">yes (holds password)</td><td class="yes">no password anywhere</td></tr>
+    <tr><td>Survives revocation</td><td class="no">yes (shared key)</td><td class="yes">token revoke kills it instantly</td></tr>
+    <tr><td>Goes undetected</td><td class="no">yes (no read log)</td><td class="yes">every read in access_log</td></tr>
+    <tr><td>DB/provider breach exposes cookies</td><td class="no">yes</td><td class="yes">no — ciphertext only</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Decision log</h2>
+<div class="card">
+<table>
+  <thead><tr><th>Phase</th><th>Shipped</th><th>Commit</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td>0</td><td>Design spec + crypto interop spike</td><td class="mono">7ee4ab0</td><td>Prove the format before building on it</td></tr>
+    <tr><td>1</td><td>Schema + RLS + deploy guide</td><td class="mono">3fd7e9a</td><td>Owner-only rows; broker via service role</td></tr>
+    <tr><td>2</td><td>Envelope crypto core + real-module interop</td><td class="mono">c238ccf</td><td>One shared module, no third-party crypto</td></tr>
+    <tr><td>3+4</td><td>Broker + Python/Node clients + e2e</td><td class="mono">caa536a</td><td>Scope + audit + revoke; no secrets on servers</td></tr>
+    <tr><td>5</td><td>Extension writer + owner console</td><td class="mono">9109b24</td><td>Envelope writer; secrets out of synced storage</td></tr>
+    <tr><td>6</td><td>Docs, test-cases, this roadmap</td><td class="mono">(this)</td><td>Durable, reviewable artifact</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Roadmap</h2>
+<div class="card">
+<table>
+  <thead><tr><th>When</th><th>Item</th><th>Unlock</th><th>Status</th></tr></thead>
+  <tbody>
+    <tr><td>Now</td><td>Provision new free Supabase project, apply schema, deploy broker</td><td>Go live</td><td><span class="tag t-now">Phase 7</span></td></tr>
+    <tr><td>Now</td><td>Register first server (e.g. Kiket EC2), issue token, e2e read</td><td>First real use</td><td><span class="tag t-now">Phase 7</span></td></tr>
+    <tr><td>Next</td><td>Load-test rate limiting; scheduled <code>cleanup_expired_cookies()</code></td><td>Hardening</td><td><span class="tag t-next">Later</span></td></tr>
+    <tr><td>Next</td><td>Auto-onboard the whole Kiket fleet (scripted keygen + register)</td><td>Scale</td><td><span class="tag t-next">Later</span></td></tr>
+    <tr><td>Later</td><td>Token auto-expiry reminders; per-server read quotas</td><td>Ops polish</td><td><span class="tag t-next">Later</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Open decisions (for you)</h2>
+<div class="grid">
+  <div class="card"><strong>1. Provisioning</strong><p class="mono" style="margin-top:6px">Create the new Supabase project together now (I drive the CLI/browser), or you create it and hand me the URL + keys?</p></div>
+  <div class="card"><strong>2. First server</strong><p class="mono" style="margin-top:6px">Which box to onboard first — Kiket EC2 (18.190.203.204), the Higgsfield automation host, or a laptop test?</p></div>
+  <div class="card"><strong>3. Default scope</strong><p class="mono" style="margin-top:6px">Starting allowed-domains for the first server (e.g. <code>linkedin.com, higgsfield.ai</code>)?</p></div>
+  <div class="card"><strong>4. Rate limit</strong><p class="mono" style="margin-top:6px">Reads/min per token — default is <code>120</code>. Raise for a busy scraper, lower for tighter control?</p></div>
+</div>
+
+<div class="foot">
+  Sources: <span class="mono">docs/superpowers/specs/2026-08-18-cookie-vault-v3-design.md</span> ·
+  <span class="mono">supabase/README.md</span> · <span class="mono">lib/README.md</span> ·
+  tests: <span class="mono">bash test/run_all.sh</span>. This is the canonical, always-current map for Cookie Vault v3.
+</div>
+</div>
+<script>mermaid.initialize({startOnLoad:true,theme:'dark',themeVariables:{background:'#141d2e',primaryColor:'#1b2740',lineColor:'#5b9dff',fontFamily:'ui-monospace'}});</script>
+</body>
+</html>
