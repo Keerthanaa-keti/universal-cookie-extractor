@@ -1,378 +1,240 @@
-document.addEventListener('DOMContentLoaded', function() {
-    const loadCookiesBtn = document.getElementById('loadCookiesBtn');
-    const extractAllBtn = document.getElementById('extractAllBtn');
-    const extractSelectedBtn = document.getElementById('extractSelectedBtn');
-    const copyBtn = document.getElementById('copyBtn');
-    const clearBtn = document.getElementById('clearBtn');
-    const selectAllBtn = document.getElementById('selectAllBtn');
-    const selectAuthBtn = document.getElementById('selectAuthBtn');
-    const selectSessionBtn = document.getElementById('selectSessionBtn');
-    const selectNoneBtn = document.getElementById('selectNoneBtn');
-    const filterInput = document.getElementById('filterInput');
-    const cookieSelector = document.getElementById('cookieSelector');
-    const cookieList = document.getElementById('cookieList');
-    const output = document.getElementById('output');
-    const status = document.getElementById('status');
-    const currentSite = document.getElementById('currentSite');
+document.addEventListener('DOMContentLoaded', function () {
+  const $ = (id) => document.getElementById(id);
+  const loadCookiesBtn = $('loadCookiesBtn');
+  const extractAllBtn = $('extractAllBtn');
+  const extractSelectedBtn = $('extractSelectedBtn');
+  const copyBtn = $('copyBtn');
+  const clearBtn = $('clearBtn');
+  const selectAllBtn = $('selectAllBtn');
+  const selectAuthBtn = $('selectAuthBtn');
+  const selectSessionBtn = $('selectSessionBtn');
+  const selectNoneBtn = $('selectNoneBtn');
+  const filterInput = $('filterInput');
+  const cookieSelector = $('cookieSelector');
+  const cookieList = $('cookieList');
+  const output = $('output');
+  const status = $('status');
+  const currentSite = $('currentSite');
+  const siteMeta = $('siteMeta');
+  const selectedCount = $('selectedCount');
+  const resultCard = $('resultCard');
+  const resultMeta = $('resultMeta');
+  const vaultBar = $('vaultBar');
+  const vaultDot = $('vaultDot');
+  const vaultStatusText = $('vaultStatusText');
 
-    const vaultBar = document.getElementById('vaultBar');
-    const vaultDot = document.getElementById('vaultDot');
-    const vaultStatusText = document.getElementById('vaultStatusText');
-    const vaultSettingsLink = document.getElementById('vaultSettingsLink');
+  let currentDomain = '';
+  let currentUrl = '';
+  let availableCookies = [];
 
-    let currentDomain = '';
-    let currentUrl = '';
-    let availableCookies = [];
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-    // Load vault status
-    chrome.runtime.sendMessage({ type: 'GET_VAULT_STATUS' }, (status) => {
-        if (chrome.runtime.lastError || !status) return;
-        vaultBar.style.display = 'flex';
-        if (!status.enabled) {
-            vaultDot.className = 'vault-dot off';
-            vaultStatusText.textContent = 'Vault: disabled';
-        } else if (!status.configured) {
-            vaultDot.className = 'vault-dot off';
-            vaultStatusText.textContent = 'Vault: not configured';
-        } else if (status.lastError) {
-            vaultDot.className = 'vault-dot error';
-            vaultStatusText.textContent = 'Vault: error';
-        } else if (status.lastSync) {
-            vaultDot.className = 'vault-dot on';
-            const ago = timeSince(new Date(status.lastSync));
-            vaultStatusText.textContent = `Vault: synced ${ago}`;
-        } else {
-            vaultDot.className = 'vault-dot on';
-            vaultStatusText.textContent = 'Vault: connected';
-        }
+  // ---- Vault status pill ----
+  chrome.runtime.sendMessage({ type: 'GET_VAULT_STATUS' }, (s) => {
+    if (chrome.runtime.lastError || !s) return;
+    vaultBar.style.display = 'inline-flex';
+    if (!s.enabled) { vaultDot.className = 'led off'; vaultStatusText.textContent = 'Vault off'; }
+    else if (!s.configured) { vaultDot.className = 'led off'; vaultStatusText.textContent = 'Set up vault'; }
+    else if (s.lastError) { vaultDot.className = 'led error'; vaultStatusText.textContent = 'Sync error'; }
+    else if (s.lastSync) { vaultDot.className = 'led on'; vaultStatusText.textContent = `Synced ${timeSince(new Date(s.lastSync))}`; }
+    else { vaultDot.className = 'led on'; vaultStatusText.textContent = 'Vault ready'; }
+  });
+  vaultBar.addEventListener('click', (e) => { e.preventDefault(); chrome.runtime.openOptionsPage(); });
+
+  function timeSince(date) {
+    const s = Math.floor((Date.now() - date.getTime()) / 1000);
+    if (s < 60) return 'just now';
+    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+    if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+    return `${Math.floor(s / 86400)}d ago`;
+  }
+
+  function showStatus(message, type = 'info') {
+    status.textContent = message;
+    status.className = `toast ${type} show`;
+  }
+  function hideStatus() { status.className = 'toast info'; }
+
+  function showOutput(data, meta) {
+    output.value = data;
+    resultMeta.textContent = meta;
+    resultCard.style.display = 'flex';
+    resultCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  function hideOutput() { resultCard.style.display = 'none'; output.value = ''; }
+
+  function getDomainFromUrl(url) { try { return new URL(url).hostname; } catch { return 'unknown'; } }
+
+  function isAuthCookie(cookie) {
+    const p = ['auth', 'session', 'token', 'login', 'user', 'csrf', 'xsrf', 'li_at', 'c_user', 'xs', 'fr', 'sb', 'datr',
+      'auth_token', 'twid', 'ct0', 'sessionid', 'csrftoken', 'sid', 'hsid', 'ssid', 'apisid', 'sapisid',
+      'jsessionid', 'phpsessid', 'asp.net_sessionid'];
+    const n = cookie.name.toLowerCase();
+    return p.some((x) => n.includes(x));
+  }
+
+  function flagChips(cookie) {
+    const f = [];
+    if (cookie.secure) f.push('Secure');
+    if (cookie.httpOnly) f.push('HttpOnly');
+    f.push(cookie.session ? 'Session' : 'Persistent');
+    if (cookie.sameSite && cookie.sameSite !== 'unspecified') f.push(cookie.sameSite);
+    return f.map((x) => `<span class="flag">${esc(x)}</span>`).join('');
+  }
+
+  function updateSelectedCount() {
+    const n = cookieList.querySelectorAll('.cookie-checkbox:checked').length;
+    selectedCount.textContent = n;
+    extractSelectedBtn.disabled = n === 0;
+    extractSelectedBtn.textContent = n ? `Extract ${n}` : 'Extract';
+  }
+
+  function renderCookieList(cookies) {
+    const filter = filterInput.value.toLowerCase();
+    const filtered = cookies.filter((c) => !filter || c.name.toLowerCase().includes(filter) || c.domain.toLowerCase().includes(filter));
+    // auth cookies first, then alphabetical
+    filtered.sort((a, b) => (isAuthCookie(b) - isAuthCookie(a)) || a.name.localeCompare(b.name));
+
+    if (filtered.length === 0) { cookieList.innerHTML = '<div class="empty">No cookies match.</div>'; updateSelectedCount(); return; }
+
+    cookieList.innerHTML = filtered.map((cookie, i) => {
+      const idx = availableCookies.indexOf(cookie);
+      const auth = isAuthCookie(cookie);
+      return `<label class="cookie-item${auth ? ' is-auth' : ''}" style="animation-delay:${Math.min(i * 18, 260)}ms">
+        <input type="checkbox" class="cookie-checkbox" data-cookie-index="${idx}" ${auth ? 'checked' : ''}>
+        <div class="cookie-info">
+          <div class="cookie-line">
+            <span class="cookie-name">${esc(cookie.name)}</span>
+            ${auth ? '<span class="badge auth">Auth</span>' : ''}
+          </div>
+          <div class="cookie-domain">${esc(cookie.domain)}${esc(cookie.path || '')}</div>
+          <div class="cookie-flags">${flagChips(cookie)}</div>
+        </div>
+      </label>`;
+    }).join('');
+    updateSelectedCount();
+  }
+
+  function updateCookieSelection(selector) {
+    cookieList.querySelectorAll('.cookie-checkbox').forEach((cb) => {
+      const cookie = availableCookies[parseInt(cb.dataset.cookieIndex)];
+      if (selector === 'all') cb.checked = true;
+      else if (selector === 'none') cb.checked = false;
+      else if (selector === 'auth') cb.checked = isAuthCookie(cookie);
+      else if (selector === 'session') cb.checked = cookie.session;
     });
+    updateSelectedCount();
+  }
 
-    vaultSettingsLink.addEventListener('click', (e) => {
-        e.preventDefault();
-        chrome.runtime.openOptionsPage();
+  function flashChip(btn) {
+    [selectAllBtn, selectAuthBtn, selectSessionBtn, selectNoneBtn].forEach((b) => b.classList.remove('is-on'));
+    btn.classList.add('is-on');
+  }
+
+  // update counter on any manual checkbox toggle
+  cookieList.addEventListener('change', (e) => { if (e.target.classList.contains('cookie-checkbox')) updateSelectedCount(); });
+
+  // ---- current tab ----
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (tabs[0] && tabs[0].url) {
+      currentUrl = tabs[0].url;
+      currentDomain = getDomainFromUrl(currentUrl);
+      currentSite.textContent = currentDomain;
+    } else {
+      currentSite.textContent = 'No active tab';
+      loadCookiesBtn.disabled = true;
+    }
+  });
+
+  // ---- scan this site ----
+  loadCookiesBtn.addEventListener('click', async () => {
+    if (!currentDomain) { showStatus('Open a website first.', 'error'); return; }
+    try {
+      loadCookiesBtn.disabled = true;
+      const cookies = await chrome.cookies.getAll({ domain: currentDomain });
+      const parent = await chrome.cookies.getAll({ domain: '.' + currentDomain.replace(/^www\./, '') });
+      availableCookies = [...cookies, ...parent].filter((c, i, self) =>
+        i === self.findIndex((x) => x.name === c.name && x.domain === c.domain));
+      availableCookies.forEach((c) => { c.session = !c.expirationDate; });
+
+      if (availableCookies.length === 0) {
+        showStatus(`No cookies for ${currentDomain}. Try logging in first.`, 'error');
+        cookieSelector.style.display = 'none';
+      } else {
+        const authN = availableCookies.filter(isAuthCookie).length;
+        siteMeta.innerHTML = `<b>${authN}</b> auth · ${availableCookies.length} total`;
+        cookieSelector.style.display = 'block';
+        renderCookieList(availableCookies);
+        loadCookiesBtn.textContent = 'Rescan';
+        hideStatus();
+      }
+    } catch (err) {
+      showStatus(`Error: ${err.message}`, 'error');
+    } finally {
+      loadCookiesBtn.disabled = false;
+    }
+  });
+
+  // ---- extract selected ----
+  extractSelectedBtn.addEventListener('click', () => {
+    const checked = cookieList.querySelectorAll('.cookie-checkbox:checked');
+    if (checked.length === 0) { showStatus('Select at least one cookie.', 'error'); return; }
+    const selected = [...checked].map((cb) => {
+      const c = availableCookies[parseInt(cb.dataset.cookieIndex)];
+      return { name: c.name, value: c.value, domain: c.domain, path: c.path, secure: c.secure,
+        httpOnly: c.httpOnly, sameSite: c.sameSite, expirationDate: c.expirationDate, session: c.session };
     });
+    const data = { timestamp: new Date().toISOString(), extractionType: 'selected_cookies', currentUrl,
+      domain: currentDomain, totalAvailable: availableCookies.length, selectedCount: selected.length, cookies: selected };
+    const json = JSON.stringify(data, null, 2);
+    showOutput(json, `${selected.length} cookies · ${fmtBytes(json.length)}`);
+    hideStatus();
+  });
 
-    function timeSince(date) {
-        const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-        if (seconds < 60) return 'just now';
-        if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-        if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-        return `${Math.floor(seconds / 86400)}d ago`;
+  // ---- extract all sites ----
+  extractAllBtn.addEventListener('click', async () => {
+    try {
+      extractAllBtn.disabled = true;
+      showStatus('Reading all cookies…', 'info');
+      const all = await chrome.cookies.getAll({});
+      if (all.length === 0) { showStatus('No cookies in browser.', 'error'); return; }
+      const byDomain = {};
+      all.forEach((c) => {
+        (byDomain[c.domain] ||= []).push({ name: c.name, value: c.value, domain: c.domain, path: c.path,
+          secure: c.secure, httpOnly: c.httpOnly, sameSite: c.sameSite, expirationDate: c.expirationDate, session: !c.expirationDate });
+      });
+      const data = { timestamp: new Date().toISOString(), extractionType: 'all_sites', totalCookies: all.length,
+        domainCount: Object.keys(byDomain).length, domains: Object.keys(byDomain).sort(), cookiesByDomain: byDomain };
+      const json = JSON.stringify(data, null, 2);
+      showOutput(json, `${all.length} cookies · ${Object.keys(byDomain).length} sites · ${fmtBytes(json.length)}`);
+      hideStatus();
+    } catch (err) {
+      showStatus(`Error: ${err.message}`, 'error');
+    } finally {
+      extractAllBtn.disabled = false;
     }
+  });
 
-    function showStatus(message, type = 'info') {
-        status.textContent = message;
-        status.className = `status ${type}`;
+  function fmtBytes(n) { return n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`; }
+
+  selectAllBtn.addEventListener('click', () => { updateCookieSelection('all'); flashChip(selectAllBtn); });
+  selectAuthBtn.addEventListener('click', () => { updateCookieSelection('auth'); flashChip(selectAuthBtn); });
+  selectSessionBtn.addEventListener('click', () => { updateCookieSelection('session'); flashChip(selectSessionBtn); });
+  selectNoneBtn.addEventListener('click', () => { updateCookieSelection('none'); flashChip(selectNoneBtn); });
+
+  filterInput.addEventListener('input', () => { if (availableCookies.length) renderCookieList(availableCookies); });
+
+  copyBtn.addEventListener('click', async () => {
+    if (!output.value) { showStatus('Nothing to copy yet.', 'error'); return; }
+    try {
+      await navigator.clipboard.writeText(output.value);
+      const orig = copyBtn.textContent; copyBtn.textContent = 'Copied ✓';
+      setTimeout(() => { copyBtn.textContent = orig; }, 1400);
+    } catch (err) {
+      output.closest('details').open = true; output.focus(); output.select();
+      showStatus(`Clipboard blocked — press Cmd+C.`, 'error');
     }
+  });
 
-    function showSiteInfo(domain, url) {
-        currentSite.textContent = `Current site: ${domain}`;
-        currentSite.className = 'status success';
-    }
-
-    function showOutput(data) {
-        output.style.display = 'block';
-        output.value = data;
-        copyBtn.style.display = 'inline-block';
-        clearBtn.style.display = 'inline-block';
-        // Bring the textarea into view and pre-select so Cmd+C works as a fallback
-        output.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        output.focus();
-        output.select();
-    }
-
-    function hideOutput() {
-        output.style.display = 'none';
-        copyBtn.style.display = 'none';
-        clearBtn.style.display = 'none';
-    }
-
-    function getDomainFromUrl(url) {
-        try {
-            const urlObj = new URL(url);
-            return urlObj.hostname;
-        } catch (e) {
-            return 'unknown';
-        }
-    }
-
-    function isAuthCookie(cookie) {
-        const authPatterns = [
-            'auth', 'session', 'token', 'login', 'user', 'csrf', 'xsrf',
-            'li_at', 'c_user', 'xs', 'fr', 'sb', 'datr', // Facebook
-            'auth_token', 'twid', 'ct0', // Twitter
-            'sessionid', 'csrftoken', // Instagram
-            'SID', 'HSID', 'SSID', 'APISID', 'SAPISID', // Google
-            'JSESSIONID', 'PHPSESSID', 'ASP.NET_SessionId' // Common sessions
-        ];
-        
-        return authPatterns.some(pattern => 
-            cookie.name.toLowerCase().includes(pattern.toLowerCase())
-        );
-    }
-
-    function getCookieFlags(cookie) {
-        const flags = [];
-        if (cookie.secure) flags.push('🔒Secure');
-        if (cookie.httpOnly) flags.push('🚫HttpOnly');
-        if (cookie.session) flags.push('⏱️Session');
-        else flags.push('💾Persistent');
-        if (cookie.sameSite) flags.push(`🌐${cookie.sameSite}`);
-        return flags.join(' ');
-    }
-
-    function renderCookieList(cookies) {
-        cookieList.innerHTML = '';
-        
-        const filteredCookies = cookies.filter(cookie => {
-            const filter = filterInput.value.toLowerCase();
-            return filter === '' || 
-                   cookie.name.toLowerCase().includes(filter) ||
-                   cookie.domain.toLowerCase().includes(filter);
-        });
-
-        if (filteredCookies.length === 0) {
-            cookieList.innerHTML = '<p style="text-align: center; color: #666;">No cookies found</p>';
-            return;
-        }
-
-        filteredCookies.forEach((cookie, index) => {
-            const item = document.createElement('div');
-            item.className = 'cookie-item';
-            
-            const isAuth = isAuthCookie(cookie);
-            
-            item.innerHTML = `
-                <input type="checkbox" class="cookie-checkbox" 
-                       id="cookie-${index}" 
-                       data-cookie-index="${availableCookies.indexOf(cookie)}"
-                       ${isAuth ? 'checked' : ''}>
-                <div class="cookie-info">
-                    <div class="cookie-name">${cookie.name}</div>
-                    <div class="cookie-domain">${cookie.domain}${cookie.path}</div>
-                    <div class="cookie-flags">${getCookieFlags(cookie)}</div>
-                </div>
-            `;
-            
-            cookieList.appendChild(item);
-        });
-
-        showStatus(`Loaded ${filteredCookies.length} cookies. Select which ones to extract.`, 'success');
-    }
-
-    function updateCookieSelection(selector) {
-        const checkboxes = cookieList.querySelectorAll('.cookie-checkbox');
-        checkboxes.forEach(checkbox => {
-            const cookieIndex = parseInt(checkbox.dataset.cookieIndex);
-            const cookie = availableCookies[cookieIndex];
-            
-            switch(selector) {
-                case 'all':
-                    checkbox.checked = true;
-                    break;
-                case 'none':
-                    checkbox.checked = false;
-                    break;
-                case 'auth':
-                    checkbox.checked = isAuthCookie(cookie);
-                    break;
-                case 'session':
-                    checkbox.checked = cookie.session;
-                    break;
-            }
-        });
-    }
-
-    // Get current tab info
-    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-        if (tabs[0] && tabs[0].url) {
-            currentUrl = tabs[0].url;
-            currentDomain = getDomainFromUrl(currentUrl);
-            showSiteInfo(currentDomain, currentUrl);
-            showStatus(`Ready to load cookies from ${currentDomain}`, 'info');
-        } else {
-            showStatus('No active tab detected', 'error');
-        }
-    });
-
-    // Load and display cookies for selection
-    loadCookiesBtn.addEventListener('click', async function() {
-        if (!currentDomain) {
-            showStatus('No website detected. Please navigate to a website first.', 'error');
-            return;
-        }
-
-        try {
-            loadCookiesBtn.disabled = true;
-            showStatus(`Loading cookies from ${currentDomain}...`, 'info');
-
-            // Get cookies for the current domain and its parent domain
-            const cookies = await chrome.cookies.getAll({
-                domain: currentDomain
-            });
-
-            const parentDomain = '.' + currentDomain.replace(/^www\./, '');
-            const parentCookies = await chrome.cookies.getAll({
-                domain: parentDomain
-            });
-
-            // Combine and deduplicate cookies
-            const allCookies = [...cookies, ...parentCookies];
-            availableCookies = allCookies.filter((cookie, index, self) => 
-                index === self.findIndex(c => c.name === cookie.name && c.domain === cookie.domain)
-            );
-
-            // Add session flag
-            availableCookies.forEach(cookie => {
-                cookie.session = !cookie.expirationDate;
-            });
-
-            if (availableCookies.length === 0) {
-                showStatus(`No cookies found for ${currentDomain}. Try logging in first.`, 'error');
-            } else {
-                cookieSelector.style.display = 'block';
-                renderCookieList(availableCookies);
-                loadCookiesBtn.textContent = '🔄 Reload Cookies';
-            }
-
-        } catch (error) {
-            showStatus(`Error: ${error.message}`, 'error');
-            console.error('Cookie loading error:', error);
-        } finally {
-            loadCookiesBtn.disabled = false;
-        }
-    });
-
-    // Extract selected cookies
-    extractSelectedBtn.addEventListener('click', function() {
-        const checkboxes = cookieList.querySelectorAll('.cookie-checkbox:checked');
-        
-        if (checkboxes.length === 0) {
-            showStatus('No cookies selected. Please select cookies to extract.', 'error');
-            return;
-        }
-
-        const selectedCookies = [];
-        checkboxes.forEach(checkbox => {
-            const cookieIndex = parseInt(checkbox.dataset.cookieIndex);
-            const cookie = availableCookies[cookieIndex];
-            
-            selectedCookies.push({
-                name: cookie.name,
-                value: cookie.value,
-                domain: cookie.domain,
-                path: cookie.path,
-                secure: cookie.secure,
-                httpOnly: cookie.httpOnly,
-                sameSite: cookie.sameSite,
-                expirationDate: cookie.expirationDate,
-                session: cookie.session
-            });
-        });
-
-        const cookieData = {
-            timestamp: new Date().toISOString(),
-            extractionType: 'selected_cookies',
-            currentUrl: currentUrl,
-            domain: currentDomain,
-            totalAvailable: availableCookies.length,
-            selectedCount: selectedCookies.length,
-            cookies: selectedCookies
-        };
-
-        const jsonOutput = JSON.stringify(cookieData, null, 2);
-        showOutput(jsonOutput);
-        showStatus(`Extracted ${selectedCookies.length} selected cookies from ${currentDomain}!`, 'success');
-    });
-
-    // Extract ALL cookies from ALL sites (unchanged)
-    extractAllBtn.addEventListener('click', async function() {
-        try {
-            extractAllBtn.disabled = true;
-            showStatus('Extracting ALL cookies from ALL sites...', 'info');
-
-            const allCookies = await chrome.cookies.getAll({});
-
-            if (allCookies.length === 0) {
-                showStatus('No cookies found in browser.', 'error');
-            } else {
-                const domainGroups = {};
-                allCookies.forEach(cookie => {
-                    const domain = cookie.domain;
-                    if (!domainGroups[domain]) {
-                        domainGroups[domain] = [];
-                    }
-                    domainGroups[domain].push({
-                        name: cookie.name,
-                        value: cookie.value,
-                        domain: cookie.domain,
-                        path: cookie.path,
-                        secure: cookie.secure,
-                        httpOnly: cookie.httpOnly,
-                        sameSite: cookie.sameSite,
-                        expirationDate: cookie.expirationDate,
-                        session: !cookie.expirationDate
-                    });
-                });
-
-                const cookieData = {
-                    timestamp: new Date().toISOString(),
-                    extractionType: 'all_sites',
-                    totalCookies: allCookies.length,
-                    domainCount: Object.keys(domainGroups).length,
-                    domains: Object.keys(domainGroups).sort(),
-                    cookiesByDomain: domainGroups
-                };
-
-                const jsonOutput = JSON.stringify(cookieData, null, 2);
-                showOutput(jsonOutput);
-                showStatus(`Extracted ${allCookies.length} cookies from ${Object.keys(domainGroups).length} domains!`, 'success');
-            }
-
-        } catch (error) {
-            showStatus(`Error: ${error.message}`, 'error');
-            console.error('Cookie extraction error:', error);
-        } finally {
-            extractAllBtn.disabled = false;
-        }
-    });
-
-    // Selection controls
-    selectAllBtn.addEventListener('click', () => updateCookieSelection('all'));
-    selectAuthBtn.addEventListener('click', () => updateCookieSelection('auth'));
-    selectSessionBtn.addEventListener('click', () => updateCookieSelection('session'));
-    selectNoneBtn.addEventListener('click', () => updateCookieSelection('none'));
-
-    // Filter input
-    filterInput.addEventListener('input', function() {
-        if (availableCookies.length > 0) {
-            renderCookieList(availableCookies);
-        }
-    });
-
-    // Copy and clear (unchanged)
-    copyBtn.addEventListener('click', async function() {
-        const payload = output.value;
-        if (!payload) {
-            showStatus('Nothing to copy yet — extract cookies first.', 'error');
-            return;
-        }
-        try {
-            await navigator.clipboard.writeText(payload);
-            showStatus(`Copied ${payload.length.toLocaleString()} chars to clipboard.`, 'success');
-        } catch (error) {
-            // execCommand is deprecated and unreliable; surface the real error and select
-            // the textarea so the user can press Cmd+C as a manual fallback.
-            output.focus();
-            output.select();
-            console.error('[Cookie Extractor] Clipboard write failed:', error);
-            showStatus(`Clipboard blocked (${error.message}). Press Cmd+C — text is selected.`, 'error');
-        }
-    });
-
-    clearBtn.addEventListener('click', function() {
-        hideOutput();
-        output.value = '';
-        showStatus(`Ready to load cookies from ${currentDomain}`, 'info');
-    });
+  clearBtn.addEventListener('click', () => { hideOutput(); hideStatus(); });
 });

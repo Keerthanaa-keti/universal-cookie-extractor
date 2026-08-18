@@ -1,0 +1,130 @@
+/* ============================================================================
+   Cookie Vault — shared design system (popup + options).
+   Clean, warm, premium: Claude/Apple/Airbnb sensibility. Soft paper ground,
+   a single clay accent, generous whitespace, refined type, gentle shadows.
+   ============================================================================ */
+:root {
+  /* warm neutrals */
+  --paper:   #faf9f5;   /* app background */
+  --card:    #ffffff;   /* surfaces */
+  --sunken:  #f4f2ec;   /* insets / tracks */
+  --ink:     #1f1e1c;   /* primary text */
+  --ink-2:   #6b675f;   /* secondary text */
+  --ink-3:   #9c978c;   /* tertiary text */
+  --line:    #ebe8e0;   /* hairline */
+  --line-2:  #ddd8cc;   /* stronger hairline */
+
+  /* clay accent (single, confident) */
+  --clay:      #c96442;
+  --clay-ink:  #ffffff;
+  --clay-hover:#b8573a;
+  --clay-soft: #f8ede7;
+  --clay-line: #eed7cb;
+
+  /* semantic */
+  --green:     #3f7d52; --green-soft: #eaf2ec;
+  --red:       #c14434; --red-soft:   #f9ebe8;
+  --amber:     #b7791f; --amber-soft: #f6efe0;
+  --blue:      #3f6ea5; --blue-soft:  #eaf0f6;
+
+  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Segoe UI", sans-serif;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  --r: 16px; --r-md: 12px; --r-sm: 10px; --r-xs: 8px;
+  --shadow-sm: 0 1px 2px rgba(28,25,20,.05);
+  --shadow:    0 6px 20px -8px rgba(28,25,20,.14), 0 1px 2px rgba(28,25,20,.05);
+  --shadow-lg: 0 16px 40px -16px rgba(28,25,20,.22);
+  --ease: cubic-bezier(.22,.75,.24,1);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  letter-spacing: -0.006em;
+}
+
+/* ---- typography ---- */
+.eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+.mono  { font-family: var(--mono); }
+.dim   { color: var(--ink-2); }
+.faint { color: var(--ink-3); }
+h1,h2,h3 { letter-spacing: -0.02em; }
+
+/* ---- buttons ---- */
+.btn {
+  font-family: var(--sans); font-size: 14px; font-weight: 600; letter-spacing: -0.01em;
+  border: 1px solid var(--line-2); background: var(--card); color: var(--ink);
+  border-radius: var(--r-sm); padding: 10px 16px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; white-space: nowrap;
+  transition: transform .12s var(--ease), background .16s, border-color .16s, box-shadow .16s, color .16s;
+  box-shadow: var(--shadow-sm);
+}
+.btn:hover { background: #fdfcfa; border-color: var(--line-2); box-shadow: var(--shadow); }
+.btn:active { transform: translateY(1px) scale(.995); }
+.btn:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
+.btn-primary {
+  background: var(--clay); color: var(--clay-ink); border-color: transparent;
+  box-shadow: 0 6px 16px -8px rgba(201,100,66,.7), 0 1px 2px rgba(28,25,20,.08);
+}
+.btn-primary:hover { background: var(--clay-hover); box-shadow: 0 10px 22px -10px rgba(201,100,66,.75); }
+.btn-ghost { background: transparent; border-color: transparent; color: var(--ink-2); box-shadow: none; }
+.btn-ghost:hover { background: var(--sunken); color: var(--ink); box-shadow: none; }
+.btn-danger { background: var(--card); border-color: var(--line-2); color: var(--red); }
+.btn-danger:hover { background: var(--red-soft); border-color: var(--red-soft); }
+.btn-sm { padding: 7px 11px; font-size: 12.5px; border-radius: var(--r-xs); }
+.btn-block { width: 100%; }
+
+/* ---- segmented / chips ---- */
+.chip {
+  font-family: var(--sans); font-size: 12.5px; font-weight: 550; letter-spacing: -0.01em;
+  padding: 6px 12px; border-radius: 999px; cursor: pointer; user-select: none;
+  border: 1px solid var(--line-2); background: var(--card); color: var(--ink-2);
+  transition: all .14s var(--ease);
+}
+.chip:hover { color: var(--ink); border-color: var(--line-2); background: #fdfcfa; }
+.chip.is-on { background: var(--clay-soft); border-color: var(--clay-line); color: var(--clay); }
+
+/* ---- inputs ---- */
+.field {
+  width: 100%; font-family: var(--sans); font-size: 14px;
+  background: var(--card); border: 1px solid var(--line-2); border-radius: var(--r-sm);
+  color: var(--ink); padding: 11px 13px; outline: none;
+  transition: border-color .16s, box-shadow .16s;
+}
+.field::placeholder { color: var(--ink-3); }
+.field:focus { border-color: var(--clay-line); box-shadow: 0 0 0 4px rgba(201,100,66,.12); }
+label { display: block; font-size: 13px; font-weight: 600; color: var(--ink-2); margin-bottom: 6px; letter-spacing: -0.01em; }
+
+/* ---- surfaces ---- */
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow-sm); }
+
+/* ---- status dot ---- */
+.led { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--ink-3); }
+.led.on    { background: var(--green); box-shadow: 0 0 0 3px var(--green-soft); }
+.led.warn  { background: var(--amber); box-shadow: 0 0 0 3px var(--amber-soft); }
+.led.error { background: var(--red);   box-shadow: 0 0 0 3px var(--red-soft); }
+.led.off   { background: var(--ink-3); box-shadow: 0 0 0 3px var(--sunken); }
+
+/* ---- badges / pills ---- */
+.badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700; letter-spacing: .02em; padding: 2px 8px; border-radius: 999px; text-transform: uppercase; }
+.badge.ok   { background: var(--green-soft); color: var(--green); }
+.badge.warn { background: var(--amber-soft); color: var(--amber); }
+.badge.bad  { background: var(--red-soft);   color: var(--red); }
+.badge.auth { background: var(--clay-soft);  color: var(--clay); }
+
+/* ---- toast ---- */
+.toast { font-size: 13px; padding: 10px 13px; border-radius: var(--r-sm); border: 1px solid var(--line); background: var(--card); color: var(--ink-2); display: flex; align-items: center; gap: 8px; box-shadow: var(--shadow-sm); }
+.toast.success { background: var(--green-soft); border-color: #d6e6da; color: var(--green); }
+.toast.error   { background: var(--red-soft);   border-color: #efd9d4; color: var(--red); }
+.toast.info    { background: var(--card);        border-color: var(--line); color: var(--ink-2); }
+
+/* ---- scrollbar ---- */
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 999px; border: 3px solid var(--paper); }
+::-webkit-scrollbar-thumb:hover { background: #cdc7ba; }

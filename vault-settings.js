@@ -133,7 +133,7 @@ async function loadServers() {
         <td class="mono">${esc((s.allowed_domains || []).join(', ') || '—')}</td>
         <td class="mono">${esc(s.public_key.slice(0, 14))}…</td>
         <td>${fmtTime(s.last_used_at)}</td>
-        <td>${s.revoked ? '' : `<button class="btn-danger btn-sm" data-revoke-server="${s.id}">Revoke</button>`}</td>`;
+        <td>${s.revoked ? '' : `<button class="btn btn-danger btn-sm" data-revoke-server="${s.id}">Revoke</button>`}</td>`;
       el.serversBody.appendChild(tr);
     }
     // token dropdown
@@ -181,7 +181,7 @@ async function loadTokens() {
       const tr = document.createElement('tr');
       tr.innerHTML = `<td class="mono">${esc(t.token_prefix)}…</td><td>${esc(t.server_keys ? t.server_keys.label : '—')}</td>
         <td>${esc(t.label || '—')}</td><td>${t.expires_at ? fmtTime(t.expires_at) : 'never'}</td><td>${badge}</td>
-        <td>${t.revoked ? '' : `<button class="btn-danger btn-sm" data-revoke-token="${t.id}">Revoke</button>`}</td>`;
+        <td>${t.revoked ? '' : `<button class="btn btn-danger btn-sm" data-revoke-token="${t.id}">Revoke</button>`}</td>`;
       el.tokensBody.appendChild(tr);
     }
   } catch (e) { status('Load tokens failed: ' + e.message, 'error'); }

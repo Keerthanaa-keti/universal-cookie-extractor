@@ -1,208 +1,161 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8">
-    <style>
-        body {
-            width: 400px;
-            height: 600px;
-            padding: 20px;
-            font-family: Arial, sans-serif;
-        }
-        .header {
-            text-align: center;
-            color: #0a66c2;
-            margin-bottom: 20px;
-        }
-        .status {
-            padding: 10px;
-            border-radius: 5px;
-            margin: 10px 0;
-            text-align: center;
-        }
-        .status.success {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        .status.error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        .status.info {
-            background-color: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-        }
-        button {
-            width: 100%;
-            padding: 12px;
-            background-color: #0a66c2;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 14px;
-            cursor: pointer;
-            margin: 10px 0;
-        }
-        button:hover {
-            background-color: #004182;
-        }
-        button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-        textarea {
-            width: 100%;
-            height: 150px;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            font-family: monospace;
-            font-size: 12px;
-            resize: vertical;
-        }
-        .instructions {
-            font-size: 12px;
-            color: #666;
-            margin: 10px 0;
-        }
-        .cookie-selector {
-            max-height: 200px;
-            overflow-y: auto;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            padding: 10px;
-            margin: 10px 0;
-            display: none;
-        }
-        .cookie-item {
-            display: flex;
-            align-items: center;
-            padding: 5px 0;
-            border-bottom: 1px solid #eee;
-        }
-        .cookie-item:last-child {
-            border-bottom: none;
-        }
-        .cookie-checkbox {
-            margin-right: 10px;
-        }
-        .cookie-info {
-            flex: 1;
-            font-size: 12px;
-        }
-        .cookie-name {
-            font-weight: bold;
-            color: #0a66c2;
-        }
-        .cookie-domain {
-            color: #666;
-            font-size: 10px;
-        }
-        .cookie-flags {
-            color: #999;
-            font-size: 10px;
-        }
-        .filter-input {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 3px;
-            margin-bottom: 10px;
-            font-size: 12px;
-        }
-        .select-controls {
-            display: flex;
-            justify-content: space-between;
-            margin: 10px 0;
-        }
-        .select-controls button {
-            padding: 5px 10px;
-            font-size: 11px;
-            width: auto;
-            margin: 0 2px;
-        }
-        .vault-bar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 8px 12px;
-            background: #f0f4f8;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            margin: 10px 0;
-            font-size: 12px;
-        }
-        .vault-bar .vault-status {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .vault-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-        }
-        .vault-dot.on { background: #22c55e; }
-        .vault-dot.off { background: #94a3b8; }
-        .vault-dot.error { background: #ef4444; }
-        .vault-bar a {
-            color: #0a66c2;
-            text-decoration: none;
-            font-weight: 500;
-        }
-        .vault-bar a:hover { text-decoration: underline; }
-    </style>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="ui.css">
+  <style>
+    body { width: 380px; }
+    .app { padding: 16px 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+
+    /* header */
+    .top { display: flex; align-items: center; justify-content: space-between; }
+    .brand { display: flex; align-items: center; gap: 9px; }
+    .brand .name { font-size: 16px; font-weight: 700; letter-spacing: -0.02em; }
+    .vault-pill {
+      display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+      background: var(--card); border: 1px solid var(--line-2); border-radius: 999px;
+      padding: 5px 11px 5px 9px; font-size: 12px; color: var(--ink-2); font-weight: 550;
+      box-shadow: var(--shadow-sm); transition: background .15s, border-color .15s, transform .12s var(--ease);
+    }
+    .vault-pill:hover { background: #fdfcfa; border-color: var(--line-2); }
+    .vault-pill:active { transform: translateY(1px); }
+
+    /* this-site block */
+    .site { padding: 14px 15px; display: flex; flex-direction: column; gap: 12px; }
+    .site-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+    .site-domain { font-size: 17px; font-weight: 650; letter-spacing: -0.02em; margin-top: 3px; word-break: break-all; }
+    .site-meta { font-size: 12px; color: var(--ink-3); text-align: right; white-space: nowrap; margin-top: 4px; }
+    .site-meta b { color: var(--clay); font-weight: 700; }
+
+    /* toast (kept subtle) */
+    #status { display: none; }
+    #status.show { display: flex; }
+
+    /* selector */
+    .tools { display: flex; flex-direction: column; gap: 9px; margin-bottom: 4px; }
+    .segmented { display: flex; gap: 6px; }
+    .list { display: flex; flex-direction: column; max-height: 264px; overflow-y: auto; margin: 0 -4px; padding: 0 4px; }
+
+    .cookie-item {
+      display: flex; align-items: center; gap: 11px; padding: 10px 10px; border-radius: var(--r-sm);
+      cursor: pointer; transition: background .12s var(--ease);
+      animation: rowIn .32s var(--ease) both;
+    }
+    .cookie-item:hover { background: var(--sunken); }
+    .cookie-item.is-auth { background: linear-gradient(90deg, var(--clay-soft), transparent 70%); }
+    .cookie-item.is-auth:hover { background: linear-gradient(90deg, #f6e6dd, var(--sunken) 80%); }
+    @keyframes rowIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+    .cookie-checkbox { appearance: none; -webkit-appearance: none; width: 19px; height: 19px; flex: none;
+      border: 1.5px solid var(--line-2); border-radius: 6px; background: var(--card); cursor: pointer;
+      position: relative; transition: background .14s var(--ease), border-color .14s; }
+    .cookie-checkbox:hover { border-color: #c7bfae; }
+    .cookie-checkbox:checked { background: var(--clay); border-color: var(--clay); }
+    .cookie-checkbox:checked::after { content: ""; position: absolute; left: 5.5px; top: 2px; width: 5px; height: 10px;
+      border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+
+    .cookie-info { flex: 1; min-width: 0; }
+    .cookie-line { display: flex; align-items: center; gap: 7px; }
+    .cookie-name { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--ink);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cookie-domain { font-size: 11.5px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
+    .cookie-flags { display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap; }
+    .flag { font-size: 10px; font-weight: 600; color: var(--ink-2); background: var(--sunken); border-radius: 5px; padding: 1px 6px; letter-spacing: .01em; }
+
+    .empty { text-align: center; color: var(--ink-3); font-size: 13px; padding: 22px 0; }
+
+    /* extract bar */
+    .actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 2px; }
+    .sel-count { font-size: 13px; color: var(--ink-2); }
+    .sel-count b { color: var(--ink); font-weight: 700; }
+
+    /* result */
+    .result { padding: 13px 14px; display: flex; flex-direction: column; gap: 10px; }
+    .result-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .result-meta { font-size: 14px; font-weight: 650; margin-top: 2px; }
+    .result-actions { display: flex; gap: 7px; }
+    details.raw summary { font-size: 12px; color: var(--ink-2); cursor: pointer; list-style: none; user-select: none; }
+    details.raw summary::-webkit-details-marker { display: none; }
+    details.raw summary::before { content: "▸ "; color: var(--ink-3); }
+    details.raw[open] summary::before { content: "▾ "; }
+    #output { width: 100%; height: 150px; margin-top: 8px; padding: 10px; border: 1px solid var(--line-2);
+      border-radius: var(--r-sm); background: var(--sunken); color: var(--ink-2); font-family: var(--mono);
+      font-size: 11.5px; resize: vertical; }
+
+    .all-sites { font-size: 12.5px; color: var(--ink-3); }
+    .all-sites:hover { color: var(--ink-2); }
+  </style>
 </head>
 <body>
-    <h2 class="header">🍪 Universal Cookie Extractor</h2>
-    
-    <div id="currentSite" class="status info">
-        Detecting current website...
-    </div>
-    
-    <div id="vaultBar" class="vault-bar" style="display: none;">
-        <div class="vault-status">
-            <span id="vaultDot" class="vault-dot off"></span>
-            <span id="vaultStatusText">Vault: disabled</span>
-        </div>
-        <a href="#" id="vaultSettingsLink">Settings</a>
-    </div>
+  <div class="app">
+    <header class="top">
+      <div class="brand">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" fill="#ecd5b8"/>
+          <path d="M12 2a10 10 0 100 20 10 10 0 000-20Zm0 1.6a8.4 8.4 0 110 16.8 8.4 8.4 0 010-16.8Z" fill="#e0be97"/>
+          <circle cx="9" cy="9" r="1.5" fill="#b5573a"/>
+          <circle cx="15.2" cy="10.4" r="1.2" fill="#b5573a"/>
+          <circle cx="10.4" cy="14.6" r="1.3" fill="#b5573a"/>
+          <circle cx="14.6" cy="15" r="1" fill="#b5573a"/>
+        </svg>
+        <span class="name">Cookie Vault</span>
+      </div>
+      <button class="vault-pill" id="vaultBar" style="display:none;">
+        <span class="led off" id="vaultDot"></span>
+        <span id="vaultStatusText">Vault off</span>
+        <a href="#" id="vaultSettingsLink" style="display:none;"></a>
+      </button>
+    </header>
 
-    <div id="status" class="status info">
-        Ready to extract cookies
-    </div>
-    
-    <div class="instructions">
-        <strong>Instructions:</strong><br>
-        1. Navigate to any website<br>
-        2. Login/authenticate as needed<br>
-        3. Click "Extract Cookies" below<br>
-        4. Copy the JSON output to share
-    </div>
-    
-    <button id="loadCookiesBtn">📋 Load & Select Cookies</button>
-    <button id="extractAllBtn">🌐 Extract All Cookies (All Sites)</button>
-    
-    <div id="cookieSelector" class="cookie-selector">
-        <input type="text" id="filterInput" class="filter-input" placeholder="Filter cookies by name...">
-        <div class="select-controls">
-            <button id="selectAllBtn">✅ All</button>
-            <button id="selectAuthBtn">🔐 Auth</button>
-            <button id="selectSessionBtn">⏱️ Session</button>
-            <button id="selectNoneBtn">❌ None</button>
+    <section class="site card">
+      <div class="site-row">
+        <div style="min-width:0;">
+          <div class="eyebrow">This site</div>
+          <div class="site-domain" id="currentSite">…</div>
         </div>
-        <div id="cookieList"></div>
-        <button id="extractSelectedBtn">🚀 Extract Selected Cookies</button>
-    </div>
-    
-    <button id="copyBtn" style="display: none;">📋 Copy to Clipboard</button>
-    <button id="clearBtn" style="display: none;">🗑️ Clear</button>
-    
-    <textarea id="output" placeholder="Cookie data will appear here..." readonly style="display: none;"></textarea>
+        <div class="site-meta" id="siteMeta"></div>
+      </div>
+      <button class="btn btn-primary btn-block" id="loadCookiesBtn">Scan this site</button>
+    </section>
 
-    <script src="popup.js"></script>
+    <div class="toast info" id="status">Ready</div>
+
+    <section id="cookieSelector" style="display:none;">
+      <div class="tools">
+        <input type="text" class="field" id="filterInput" placeholder="Filter cookies">
+        <div class="segmented">
+          <button class="chip" id="selectAuthBtn">Auth</button>
+          <button class="chip" id="selectAllBtn">All</button>
+          <button class="chip" id="selectSessionBtn">Session</button>
+          <button class="chip" id="selectNoneBtn">None</button>
+        </div>
+      </div>
+      <div class="list" id="cookieList"></div>
+      <div class="actions" id="extractBar">
+        <span class="sel-count"><b id="selectedCount">0</b> selected</span>
+        <button class="btn btn-primary" id="extractSelectedBtn">Extract</button>
+      </div>
+    </section>
+
+    <section class="result card" id="resultCard" style="display:none;">
+      <div class="result-head">
+        <div>
+          <div class="eyebrow">Result</div>
+          <div class="result-meta" id="resultMeta">—</div>
+        </div>
+        <div class="result-actions">
+          <button class="btn btn-primary btn-sm" id="copyBtn">Copy</button>
+          <button class="btn btn-ghost btn-sm" id="clearBtn">Clear</button>
+        </div>
+      </div>
+      <details class="raw"><summary>View JSON</summary>
+        <textarea id="output" readonly placeholder="Cookie data will appear here…"></textarea>
+      </details>
+    </section>
+
+    <button class="btn btn-ghost btn-block all-sites" id="extractAllBtn">Extract all sites…</button>
+  </div>
+
+  <script src="popup.js"></script>
 </body>
 </html>
