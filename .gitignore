@@ -1,0 +1,22 @@
+__pycache__/
+*.pyc
+output/
+
+# OS junk
+.DS_Store
+**/.DS_Store
+
+# large media / test artifacts
+*.mp4
+
+# secrets & keys — NEVER commit (Cookie Vault v3)
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+.cookie-vault/
+cookie-vault-*.key
+secrets.*
+supabase/.env
+supabase/functions/**/.env
