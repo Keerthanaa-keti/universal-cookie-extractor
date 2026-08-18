@@ -1,11 +1,15 @@
 {
   "name": "cookie-vault",
-  "version": "1.0.0",
-  "description": "Node.js client for Cookie Vault - encrypted cloud cookie storage",
+  "version": "3.0.0",
+  "description": "Node.js client for Cookie Vault v3 - zero-knowledge scoped cookie access",
+  "type": "module",
   "main": "cookie-vault.js",
-  "keywords": ["cookies", "vault", "encrypted", "supabase"],
+  "bin": {
+    "cookie-vault": "cookie-vault.js"
+  },
+  "keywords": ["cookies", "vault", "zero-knowledge", "x25519", "supabase"],
   "license": "MIT",
   "engines": {
-    "node": ">=16.0.0"
+    "node": ">=18.0.0"
   }
 }
