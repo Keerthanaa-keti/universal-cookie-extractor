@@ -75,6 +75,10 @@ document.addEventListener('DOMContentLoaded', function() {
         output.value = data;
         copyBtn.style.display = 'inline-block';
         clearBtn.style.display = 'inline-block';
+        // Bring the textarea into view and pre-select so Cmd+C works as a fallback
+        output.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        output.focus();
+        output.select();
     }
 
     function hideOutput() {
@@ -348,13 +352,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Copy and clear (unchanged)
     copyBtn.addEventListener('click', async function() {
+        const payload = output.value;
+        if (!payload) {
+            showStatus('Nothing to copy yet — extract cookies first.', 'error');
+            return;
+        }
         try {
-            await navigator.clipboard.writeText(output.value);
-            showStatus('Cookies copied to clipboard!', 'success');
+            await navigator.clipboard.writeText(payload);
+            showStatus(`Copied ${payload.length.toLocaleString()} chars to clipboard.`, 'success');
         } catch (error) {
+            // execCommand is deprecated and unreliable; surface the real error and select
+            // the textarea so the user can press Cmd+C as a manual fallback.
+            output.focus();
             output.select();
-            document.execCommand('copy');
-            showStatus('Cookies copied to clipboard!', 'success');
+            console.error('[Cookie Extractor] Clipboard write failed:', error);
+            showStatus(`Clipboard blocked (${error.message}). Press Cmd+C — text is selected.`, 'error');
         }
     });
 
