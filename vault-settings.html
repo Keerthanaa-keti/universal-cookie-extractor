@@ -84,49 +84,40 @@
 
     <!-- CONNECTION -->
     <div class="panel active" id="panel-connection">
-      <div class="section">
-        <div class="sync-status"><span id="syncDot" class="dot disabled"></span><span id="syncStatusText">Not set up</span></div>
-        <div class="toggle-row" style="margin-top:16px">
-          <div><div class="t-label">Sync my cookies</div><div class="help-text">Encrypted, then sent to your vault</div></div>
-          <label class="toggle"><input type="checkbox" id="vaultEnabled"><span class="toggle-slider"></span></label>
-        </div>
-      </div>
-
-      <div class="section">
-        <div class="section-title">Your vault</div>
-        <div class="field-group"><label for="supabaseUrl">Project URL</label><input type="text" class="field" id="supabaseUrl" placeholder="https://your-project.supabase.co"></div>
-        <div class="field-group"><label for="supabaseAnonKey">Anon key</label><input type="password" class="field" id="supabaseAnonKey" placeholder="eyJhbG…"></div>
-      </div>
-
-      <div class="section">
+      <div class="section" id="connectCard">
         <div class="section-title">Sign in</div>
+        <p class="help-text" style="margin-bottom:18px">Sign in once. Your cookies then sync to your servers automatically.</p>
         <div class="field-group"><label for="vaultEmail">Email</label><input type="email" class="field" id="vaultEmail" placeholder="you@example.com"></div>
-        <div class="field-group"><label for="vaultPassword">Password</label><input type="password" class="field" id="vaultPassword" placeholder="used once, not stored"></div>
-        <div id="authState" class="help-text"></div>
-        <div class="btn-row"><button class="btn btn-ghost" id="signInBtn">Sign in</button></div>
+        <div class="field-group"><label for="vaultPassword">Password</label><input type="password" class="field" id="vaultPassword" placeholder="••••••••"></div>
+        <div class="btn-row"><button class="btn btn-primary btn-block" id="connectBtn">Connect &amp; start syncing</button></div>
+        <div id="connectState" class="help-text" style="margin-top:12px"></div>
       </div>
 
-      <div class="section">
-        <div class="section-title">Passphrase</div>
-        <div class="field-group"><input type="password" class="field" id="vaultKey" placeholder="a phrase only you know"><div class="help-text">Kept on this device. Your servers never see it.</div></div>
+      <div class="section" id="statusCard" style="display:none;">
+        <div class="sync-status"><span id="syncDot" class="dot disabled"></span><span id="syncStatusText">Not set up</span></div>
+        <div class="btn-row"><button class="btn btn-ghost" id="syncNowBtn">Sync now</button><button class="btn btn-ghost" id="manageServersBtn">Manage servers</button></div>
       </div>
 
-      <div class="section">
-        <div class="section-title">What to sync</div>
-        <div class="field-group"><select class="field" id="syncMode">
-          <option value="auth_only">Login cookies only (recommended)</option>
-          <option value="selected_domains">Only chosen sites</option>
-          <option value="all">Everything</option>
-        </select></div>
-        <div class="field-group" id="selectedDomainsField" style="display:none"><label for="selectedDomains">Sites (one per line)</label><textarea class="field" id="selectedDomains" placeholder=".linkedin.com&#10;.github.com"></textarea></div>
-        <div class="field-group"><label for="syncInterval">Sync every (minutes)</label><input type="number" class="field" id="syncInterval" min="1" max="60" value="5"></div>
-      </div>
-
-      <div class="btn-row">
-        <button class="btn btn-primary" id="saveBtn">Save</button>
-        <button class="btn btn-ghost" id="testBtn">Test connection</button>
-        <button class="btn btn-ghost" id="syncNowBtn">Sync now</button>
-      </div>
+      <details class="section" id="advanced">
+        <summary style="cursor:pointer; font-weight:650; font-size:14px; letter-spacing:-0.015em;">Advanced</summary>
+        <div style="margin-top:18px; display:flex; flex-direction:column; gap:15px;">
+          <div class="toggle-row">
+            <div><div class="t-label">Sync my cookies</div><div class="help-text">Turn syncing on or off</div></div>
+            <label class="toggle"><input type="checkbox" id="vaultEnabled"><span class="toggle-slider"></span></label>
+          </div>
+          <div class="field-group"><label for="supabaseUrl">Project URL</label><input type="text" class="field" id="supabaseUrl" placeholder="https://your-project.supabase.co"></div>
+          <div class="field-group"><label for="supabaseAnonKey">Anon key</label><input type="password" class="field" id="supabaseAnonKey" placeholder="eyJhbG…"></div>
+          <div class="field-group"><label for="vaultKey">Passphrase</label><input type="password" class="field" id="vaultKey" placeholder="auto-generated"><div class="help-text">Owner recovery key, set automatically. Kept on this device; servers never see it.</div></div>
+          <div class="field-group"><label for="syncMode">What to sync</label><select class="field" id="syncMode">
+            <option value="auth_only">Login cookies only (recommended)</option>
+            <option value="selected_domains">Only chosen sites</option>
+            <option value="all">Everything</option>
+          </select></div>
+          <div class="field-group" id="selectedDomainsField" style="display:none"><label for="selectedDomains">Sites (one per line)</label><textarea class="field" id="selectedDomains" placeholder=".linkedin.com&#10;.github.com"></textarea></div>
+          <div class="field-group"><label for="syncInterval">Sync every (minutes)</label><input type="number" class="field" id="syncInterval" min="1" max="60" value="5"></div>
+          <div class="btn-row"><button class="btn btn-ghost" id="saveBtn">Save</button><button class="btn btn-ghost" id="testBtn">Test connection</button></div>
+        </div>
+      </details>
     </div>
 
     <!-- SERVERS -->

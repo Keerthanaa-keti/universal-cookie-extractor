@@ -20,3 +20,6 @@ cookie-vault-*.key
 secrets.*
 supabase/.env
 supabase/functions/**/.env
+
+# baked vault defaults (local only; keeps anon key out of the public repo)
+vault-config.js

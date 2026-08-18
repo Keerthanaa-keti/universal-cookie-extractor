@@ -19,6 +19,15 @@ import {
 
 const hasChrome = typeof chrome !== 'undefined' && chrome.storage;
 
+// Pre-wired vault defaults (gitignored vault-config.js). Lets setup be "just sign in".
+let _defaults = null;
+async function vaultDefaults() {
+  if (_defaults) return _defaults;
+  try { _defaults = (await import('./vault-config.js')).VAULT_DEFAULTS; }
+  catch { _defaults = { supabase_url: '', supabase_anon_key: '', owner_email: '' }; }
+  return _defaults;
+}
+
 export class VaultSync {
   constructor() {
     this.accessToken = null;
@@ -46,7 +55,13 @@ export class VaultSync {
       vault_email: '',
       vault_password: '',   // transient: present only until first successful login
     });
-    return { ...sync, ...local };
+    const d = await vaultDefaults();
+    return {
+      ...sync, ...local,
+      supabase_url: sync.supabase_url || d.supabase_url,
+      supabase_anon_key: sync.supabase_anon_key || d.supabase_anon_key,
+      vault_email: local.vault_email || d.owner_email,
+    };
   }
 
   async isReady() {

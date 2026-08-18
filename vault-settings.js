@@ -6,7 +6,7 @@ import { b64url } from './lib/shared/vault-crypto.mjs';
 const $ = (id) => document.getElementById(id);
 const el = {};
 ['statusBar', 'syncDot', 'syncStatusText', 'vaultEnabled', 'supabaseUrl', 'supabaseAnonKey',
- 'vaultEmail', 'vaultPassword', 'authState', 'signInBtn', 'vaultKey', 'syncMode',
+ 'vaultEmail', 'vaultPassword', 'connectBtn', 'connectState', 'connectCard', 'statusCard', 'manageServersBtn', 'vaultKey', 'syncMode',
  'selectedDomains', 'selectedDomainsField', 'syncInterval', 'saveBtn', 'testBtn', 'syncNowBtn',
  'srvLabel', 'srvPubKey', 'srvDomains', 'addServerBtn', 'rewrapBtn', 'serversBody', 'serversEmpty',
  'tokServer', 'tokLabel', 'tokExpiry', 'issueTokenBtn', 'tokenReveal', 'tokensBody', 'tokensEmpty',
@@ -19,13 +19,27 @@ function status(msg, type = 'info') {
 }
 
 // ---------------- config + auth + REST --------------------------------------
+let _defaults = null;
+async function vaultDefaults() {
+  if (_defaults) return _defaults;
+  try { _defaults = (await import('./vault-config.js')).VAULT_DEFAULTS; }
+  catch { _defaults = { supabase_url: '', supabase_anon_key: '', owner_email: '' }; }
+  return _defaults;
+}
+
 async function getConfig() {
   const sync = await chrome.storage.sync.get({
     vault_enabled: false, supabase_url: '', supabase_anon_key: '',
     sync_mode: 'auth_only', selected_domains: [], sync_interval_minutes: 5,
   });
   const local = await chrome.storage.local.get({ vault_key: '', vault_refresh_token: '', vault_email: '' });
-  return { ...sync, ...local };
+  const d = await vaultDefaults();
+  return {
+    ...sync, ...local,
+    supabase_url: sync.supabase_url || d.supabase_url,
+    supabase_anon_key: sync.supabase_anon_key || d.supabase_anon_key,
+    vault_email: local.vault_email || d.owner_email,
+  };
 }
 
 let _access = null, _uid = null, _exp = 0;
@@ -79,13 +93,13 @@ async function loadConnection() {
   el.syncInterval.value = c.sync_interval_minutes;
   el.vaultEmail.value = c.vault_email;
   el.selectedDomainsField.style.display = c.sync_mode === 'selected_domains' ? 'block' : 'none';
-  el.authState.textContent = c.vault_refresh_token ? 'Signed in (refresh token stored).' : 'Not signed in.';
+  el.statusCard.style.display = c.vault_refresh_token ? 'block' : 'none';
   updateDot(c);
 }
 function updateDot(c) {
-  if (!c.vault_enabled) { el.syncDot.className = 'dot disabled'; el.syncStatusText.textContent = 'Sync disabled'; }
-  else if (!c.supabase_url || !c.vault_key) { el.syncDot.className = 'dot disconnected'; el.syncStatusText.textContent = 'Not configured'; }
-  else { el.syncDot.className = 'dot connected'; el.syncStatusText.textContent = 'Configured'; }
+  if (!c.vault_enabled) { el.syncDot.className = 'dot disabled'; el.syncStatusText.textContent = 'Sync off'; }
+  else if (!c.supabase_url) { el.syncDot.className = 'dot disconnected'; el.syncStatusText.textContent = 'Not connected'; }
+  else { el.syncDot.className = 'dot connected'; el.syncStatusText.textContent = `Connected · syncing every ${c.sync_interval_minutes} min`; }
 }
 el.syncMode.addEventListener('change', () => { el.selectedDomainsField.style.display = el.syncMode.value === 'selected_domains' ? 'block' : 'none'; });
 
@@ -101,10 +115,40 @@ el.saveBtn.addEventListener('click', async () => {
   status('Settings saved', 'success');
   loadConnection();
 });
-el.signInBtn.addEventListener('click', async () => {
-  try { await auth(true); status('Signed in — refresh token stored, password cleared.', 'success'); loadConnection(); }
-  catch (e) { status(e.message, 'error'); }
+// One-tap connect: bake defaults + auto-passphrase + sign in + first sync.
+el.connectBtn.addEventListener('click', async () => {
+  const orig = el.connectBtn.textContent;
+  el.connectBtn.disabled = true; el.connectBtn.textContent = 'Connecting…'; el.connectState.textContent = '';
+  try {
+    const d = await vaultDefaults();
+    const cur = await getConfig();
+    await chrome.storage.sync.set({
+      vault_enabled: true,
+      supabase_url: (el.supabaseUrl.value || cur.supabase_url || d.supabase_url).replace(/\/$/, ''),
+      supabase_anon_key: el.supabaseAnonKey.value || cur.supabase_anon_key || d.supabase_anon_key,
+      sync_mode: cur.sync_mode || 'auth_only',
+      selected_domains: cur.selected_domains || [],
+      sync_interval_minutes: cur.sync_interval_minutes || 5,
+    });
+    const key = cur.vault_key || ('k_' + b64url(crypto.getRandomValues(new Uint8Array(32))));
+    await chrome.storage.local.set({ vault_key: key });
+    await auth(true); // sign in → store refresh token, clear password
+    chrome.runtime.sendMessage({ type: 'VAULT_SETTINGS_UPDATED' });
+    chrome.runtime.sendMessage({ type: 'VAULT_SYNC_NOW' }, (r) => {
+      el.connectState.textContent = (r && r.success)
+        ? `Connected. Synced ${r.cookies || 0} cookies to ${r.servers || 0} server(s).`
+        : 'Connected. First sync running…';
+    });
+    status('Connected — your cookies are syncing.', 'success');
+    loadConnection();
+  } catch (e) {
+    status('Could not connect: ' + e.message, 'error');
+    el.connectState.textContent = e.message;
+  } finally {
+    el.connectBtn.disabled = false; el.connectBtn.textContent = orig;
+  }
 });
+el.manageServersBtn.addEventListener('click', () => document.querySelector('.tab[data-tab="servers"]').click());
 el.testBtn.addEventListener('click', async () => {
   try { await rest('GET', 'cookie_vaults?select=id&limit=1'); status('Connection OK — schema reachable.', 'success'); }
   catch (e) { status('Failed: ' + e.message, 'error'); }
