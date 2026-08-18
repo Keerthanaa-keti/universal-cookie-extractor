@@ -2,291 +2,160 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Cookie Vault Settings</title>
+  <title>Cookie Vault v3</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #0f172a;
-      color: #e2e8f0;
-      min-height: 100vh;
-      padding: 40px 20px;
-    }
-    .container {
-      max-width: 640px;
-      margin: 0 auto;
-    }
-    h1 {
-      font-size: 24px;
-      font-weight: 700;
-      margin-bottom: 8px;
-      color: #f8fafc;
-    }
-    .subtitle {
-      color: #94a3b8;
-      font-size: 14px;
-      margin-bottom: 32px;
-    }
-    .section {
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 12px;
-      padding: 24px;
-      margin-bottom: 20px;
-    }
-    .section-title {
-      font-size: 16px;
-      font-weight: 600;
-      color: #f8fafc;
-      margin-bottom: 16px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .field {
-      margin-bottom: 16px;
-    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; padding: 32px 20px; }
+    .container { max-width: 760px; margin: 0 auto; }
+    h1 { font-size: 24px; font-weight: 700; color: #f8fafc; }
+    .subtitle { color: #94a3b8; font-size: 14px; margin: 6px 0 24px; }
+    .tabs { display: flex; gap: 6px; margin-bottom: 20px; border-bottom: 1px solid #334155; }
+    .tab { padding: 10px 16px; font-size: 14px; font-weight: 500; color: #94a3b8; cursor: pointer; border-bottom: 2px solid transparent; }
+    .tab.active { color: #f8fafc; border-bottom-color: #3b82f6; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .section { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+    .section-title { font-size: 15px; font-weight: 600; color: #f8fafc; margin-bottom: 14px; }
+    .field { margin-bottom: 14px; }
     .field:last-child { margin-bottom: 0; }
-    label {
-      display: block;
-      font-size: 13px;
-      font-weight: 500;
-      color: #94a3b8;
-      margin-bottom: 6px;
-    }
-    input[type="text"],
-    input[type="password"],
-    input[type="email"],
-    input[type="number"],
-    select,
-    textarea {
-      width: 100%;
-      padding: 10px 12px;
-      background: #0f172a;
-      border: 1px solid #334155;
-      border-radius: 8px;
-      color: #e2e8f0;
-      font-size: 14px;
-      font-family: inherit;
-      outline: none;
-      transition: border-color 0.2s;
-    }
-    input:focus, select:focus, textarea:focus {
-      border-color: #3b82f6;
-    }
-    textarea { resize: vertical; min-height: 80px; font-family: monospace; font-size: 12px; }
-    .toggle-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 12px 0;
-    }
-    .toggle-label {
-      font-size: 14px;
-      font-weight: 500;
-      color: #f8fafc;
-    }
-    .toggle-desc {
-      font-size: 12px;
-      color: #64748b;
-      margin-top: 2px;
-    }
-    .toggle {
-      position: relative;
-      width: 44px;
-      height: 24px;
-      flex-shrink: 0;
-    }
+    label { display: block; font-size: 13px; font-weight: 500; color: #94a3b8; margin-bottom: 6px; }
+    input, select, textarea { width: 100%; padding: 10px 12px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #e2e8f0; font-size: 14px; font-family: inherit; outline: none; }
+    input:focus, select:focus, textarea:focus { border-color: #3b82f6; }
+    textarea { resize: vertical; min-height: 68px; font-family: ui-monospace, monospace; font-size: 12px; }
+    .help-text { font-size: 12px; color: #64748b; margin-top: 4px; }
+    .toggle-row { display: flex; justify-content: space-between; align-items: center; }
+    .toggle { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
     .toggle input { opacity: 0; width: 0; height: 0; }
-    .toggle-slider {
-      position: absolute;
-      inset: 0;
-      background: #334155;
-      border-radius: 12px;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    .toggle-slider::before {
-      content: '';
-      position: absolute;
-      width: 18px;
-      height: 18px;
-      left: 3px;
-      top: 3px;
-      background: #e2e8f0;
-      border-radius: 50%;
-      transition: transform 0.2s;
-    }
-    .toggle input:checked + .toggle-slider {
-      background: #3b82f6;
-    }
-    .toggle input:checked + .toggle-slider::before {
-      transform: translateX(20px);
-    }
-    .help-text {
-      font-size: 12px;
-      color: #64748b;
-      margin-top: 4px;
-    }
-    .btn-row {
-      display: flex;
-      gap: 12px;
-      margin-top: 24px;
-    }
-    button {
-      padding: 10px 20px;
-      border: none;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .btn-primary {
-      background: #3b82f6;
-      color: white;
-      flex: 1;
-    }
+    .toggle-slider { position: absolute; inset: 0; background: #334155; border-radius: 12px; cursor: pointer; transition: background .2s; }
+    .toggle-slider::before { content: ''; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; background: #e2e8f0; border-radius: 50%; transition: transform .2s; }
+    .toggle input:checked + .toggle-slider { background: #3b82f6; }
+    .toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
+    .btn-row { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+    button { padding: 10px 18px; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all .2s; }
+    .btn-primary { background: #3b82f6; color: #fff; }
     .btn-primary:hover { background: #2563eb; }
-    .btn-secondary {
-      background: #334155;
-      color: #e2e8f0;
-    }
+    .btn-secondary { background: #334155; color: #e2e8f0; }
     .btn-secondary:hover { background: #475569; }
-    .btn-danger {
-      background: #991b1b;
-      color: #fecaca;
-    }
-    .btn-danger:hover { background: #b91c1c; }
-    .status-bar {
-      padding: 12px 16px;
-      border-radius: 8px;
-      font-size: 13px;
-      margin-bottom: 20px;
-      display: none;
-    }
+    .btn-danger { background: #7f1d1d; color: #fecaca; }
+    .btn-danger:hover { background: #991b1b; }
+    .btn-sm { padding: 6px 10px; font-size: 12px; }
+    .status-bar { padding: 12px 16px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; display: none; }
     .status-bar.success { display: block; background: #064e3b; color: #6ee7b7; border: 1px solid #065f46; }
     .status-bar.error { display: block; background: #7f1d1d; color: #fca5a5; border: 1px solid #991b1b; }
     .status-bar.info { display: block; background: #1e3a5f; color: #93c5fd; border: 1px solid #1e40af; }
-    .sync-status {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 12px;
-      background: #0f172a;
-      border-radius: 8px;
-      font-size: 13px;
-      color: #94a3b8;
-    }
-    .sync-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-    .sync-dot.connected { background: #22c55e; }
-    .sync-dot.disconnected { background: #ef4444; }
-    .sync-dot.disabled { background: #64748b; }
+    .sync-status { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #0f172a; border-radius: 8px; font-size: 13px; color: #94a3b8; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .dot.connected { background: #22c55e; } .dot.disconnected { background: #ef4444; } .dot.disabled { background: #64748b; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; color: #64748b; font-weight: 500; padding: 8px; border-bottom: 1px solid #334155; font-size: 12px; }
+    td { padding: 10px 8px; border-bottom: 1px solid #24324a; vertical-align: top; }
+    .mono { font-family: ui-monospace, monospace; font-size: 12px; word-break: break-all; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+    .badge.ok { background: #064e3b; color: #6ee7b7; } .badge.warn { background: #78350f; color: #fcd34d; } .badge.bad { background: #7f1d1d; color: #fca5a5; }
+    .empty { color: #64748b; font-size: 13px; padding: 16px 8px; text-align: center; }
+    .token-reveal { background: #0f172a; border: 1px dashed #3b82f6; border-radius: 8px; padding: 12px; margin-top: 12px; }
+    .token-reveal .mono { color: #6ee7b7; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Cookie Vault Settings</h1>
-    <p class="subtitle">Encrypted cloud sync for your browser cookies</p>
-
+    <h1>Cookie Vault <span style="color:#3b82f6">v3</span></h1>
+    <p class="subtitle">Zero-knowledge, per-server scoped access to your cookies</p>
     <div id="statusBar" class="status-bar"></div>
 
-    <!-- Connection Status -->
-    <div class="section">
-      <div class="section-title">Connection Status</div>
-      <div class="sync-status">
-        <span id="syncDot" class="sync-dot disabled"></span>
-        <span id="syncStatusText">Not configured</span>
-      </div>
+    <div class="tabs">
+      <div class="tab active" data-tab="connection">Connection</div>
+      <div class="tab" data-tab="servers">Servers</div>
+      <div class="tab" data-tab="tokens">Tokens</div>
+      <div class="tab" data-tab="audit">Audit</div>
     </div>
 
-    <!-- Enable/Disable -->
-    <div class="section">
-      <div class="section-title">Vault Sync</div>
-      <div class="toggle-row">
-        <div>
-          <div class="toggle-label">Enable Cloud Sync</div>
-          <div class="toggle-desc">Encrypted cookies synced to Supabase</div>
+    <!-- CONNECTION -->
+    <div class="panel active" id="panel-connection">
+      <div class="section">
+        <div class="section-title">Status</div>
+        <div class="sync-status"><span id="syncDot" class="dot disabled"></span><span id="syncStatusText">Not configured</span></div>
+        <div class="toggle-row" style="margin-top:14px">
+          <div><div style="font-weight:500;color:#f8fafc">Enable cloud sync</div><div class="help-text">Encrypted cookies synced to Supabase</div></div>
+          <label class="toggle"><input type="checkbox" id="vaultEnabled"><span class="toggle-slider"></span></label>
         </div>
-        <label class="toggle">
-          <input type="checkbox" id="vaultEnabled">
-          <span class="toggle-slider"></span>
-        </label>
       </div>
-    </div>
-
-    <!-- Supabase Config -->
-    <div class="section">
-      <div class="section-title">Supabase Connection</div>
-      <div class="field">
-        <label for="supabaseUrl">Supabase URL</label>
-        <input type="text" id="supabaseUrl" placeholder="https://your-project.supabase.co">
+      <div class="section">
+        <div class="section-title">Supabase</div>
+        <div class="field"><label for="supabaseUrl">Project URL</label><input type="text" id="supabaseUrl" placeholder="https://your-project.supabase.co"></div>
+        <div class="field"><label for="supabaseAnonKey">Anon key</label><input type="password" id="supabaseAnonKey" placeholder="eyJhbG..."><div class="help-text">Public anon key. Safe to store.</div></div>
       </div>
-      <div class="field">
-        <label for="supabaseAnonKey">Anon Key</label>
-        <input type="password" id="supabaseAnonKey" placeholder="eyJhbG...">
-        <div class="help-text">Public anon key from Supabase project settings</div>
+      <div class="section">
+        <div class="section-title">Owner sign-in</div>
+        <div class="field"><label for="vaultEmail">Email</label><input type="email" id="vaultEmail" placeholder="you@example.com"></div>
+        <div class="field"><label for="vaultPassword">Password</label><input type="password" id="vaultPassword" placeholder="used once to get a refresh token"><div class="help-text">Not stored. After sign-in only a refresh token is kept, locally.</div></div>
+        <div id="authState" class="help-text"></div>
+        <div class="btn-row"><button class="btn-secondary" id="signInBtn">Sign in</button></div>
       </div>
-    </div>
-
-    <!-- Auth -->
-    <div class="section">
-      <div class="section-title">Authentication</div>
-      <div class="field">
-        <label for="vaultEmail">Email</label>
-        <input type="email" id="vaultEmail" placeholder="you@example.com">
+      <div class="section">
+        <div class="section-title">Encryption</div>
+        <div class="field"><label for="vaultKey">Vault passphrase</label><input type="password" id="vaultKey" placeholder="your owner passphrase"><div class="help-text">Stored locally, never synced. Lets you (the owner) recover any entry. Servers never receive it.</div></div>
       </div>
-      <div class="field">
-        <label for="vaultPassword">Password</label>
-        <input type="password" id="vaultPassword" placeholder="Supabase auth password">
-        <div class="help-text">Stored locally only, never synced to cloud</div>
-      </div>
-    </div>
-
-    <!-- Encryption -->
-    <div class="section">
-      <div class="section-title">Encryption</div>
-      <div class="field">
-        <label for="vaultKey">Vault Key (COOKIE_VAULT_KEY)</label>
-        <input type="password" id="vaultKey" placeholder="Your encryption passphrase">
-        <div class="help-text">Same key must be used in Python/Node.js clients. Use a strong passphrase.</div>
-      </div>
-    </div>
-
-    <!-- Sync Settings -->
-    <div class="section">
-      <div class="section-title">Sync Settings</div>
-      <div class="field">
-        <label for="syncMode">What to Sync</label>
-        <select id="syncMode">
+      <div class="section">
+        <div class="section-title">What to sync</div>
+        <div class="field"><select id="syncMode">
           <option value="auth_only">Auth cookies only (recommended)</option>
-          <option value="all">All cookies</option>
           <option value="selected_domains">Selected domains only</option>
-        </select>
+          <option value="all">All cookies</option>
+        </select></div>
+        <div class="field" id="selectedDomainsField" style="display:none"><label for="selectedDomains">Domains (one per line)</label><textarea id="selectedDomains" placeholder=".linkedin.com&#10;.github.com"></textarea></div>
+        <div class="field"><label for="syncInterval">Sync interval (minutes)</label><input type="number" id="syncInterval" min="1" max="60" value="5"></div>
       </div>
-      <div class="field" id="selectedDomainsField" style="display: none;">
-        <label for="selectedDomains">Domains (one per line)</label>
-        <textarea id="selectedDomains" placeholder=".linkedin.com&#10;.github.com&#10;.google.com"></textarea>
-      </div>
-      <div class="field">
-        <label for="syncInterval">Sync Interval (minutes)</label>
-        <input type="number" id="syncInterval" min="1" max="60" value="5">
+      <div class="btn-row">
+        <button class="btn-primary" id="saveBtn">Save settings</button>
+        <button class="btn-secondary" id="testBtn">Test connection</button>
+        <button class="btn-secondary" id="syncNowBtn">Sync now</button>
       </div>
     </div>
 
-    <!-- Actions -->
-    <div class="btn-row">
-      <button class="btn-primary" id="saveBtn">Save Settings</button>
-      <button class="btn-secondary" id="testBtn">Test Connection</button>
-      <button class="btn-secondary" id="syncNowBtn">Sync Now</button>
+    <!-- SERVERS -->
+    <div class="panel" id="panel-servers">
+      <div class="section">
+        <div class="section-title">Register a server</div>
+        <div class="help-text" style="margin-bottom:12px">On the server run <span class="mono">python -m cookie_vault keygen --label &lt;name&gt;</span> (or the Node equivalent), then paste its public key here.</div>
+        <div class="field"><label for="srvLabel">Label</label><input type="text" id="srvLabel" placeholder="kiket-ec2"></div>
+        <div class="field"><label for="srvPubKey">Public key (base64url)</label><input type="text" id="srvPubKey" class="mono" placeholder="the public key printed by keygen"></div>
+        <div class="field"><label for="srvDomains">Allowed domains (comma or newline; * = all)</label><textarea id="srvDomains" placeholder="linkedin.com, higgsfield.ai"></textarea></div>
+        <div class="btn-row"><button class="btn-primary" id="addServerBtn">Register server</button><button class="btn-secondary" id="rewrapBtn">Rewrap now</button></div>
+      </div>
+      <div class="section">
+        <div class="section-title">Registered servers</div>
+        <table><thead><tr><th>Label</th><th>Scope</th><th>Public key</th><th>Last used</th><th></th></tr></thead><tbody id="serversBody"></tbody></table>
+        <div id="serversEmpty" class="empty">No servers yet.</div>
+      </div>
+    </div>
+
+    <!-- TOKENS -->
+    <div class="panel" id="panel-tokens">
+      <div class="section">
+        <div class="section-title">Issue a token</div>
+        <div class="field"><label for="tokServer">Server</label><select id="tokServer"></select></div>
+        <div class="field"><label for="tokLabel">Label (optional)</label><input type="text" id="tokLabel" placeholder="ci-runner"></div>
+        <div class="field"><label for="tokExpiry">Expires in days (blank = never)</label><input type="number" id="tokExpiry" min="1" placeholder="90"></div>
+        <div class="btn-row"><button class="btn-primary" id="issueTokenBtn">Issue token</button></div>
+        <div id="tokenReveal"></div>
+      </div>
+      <div class="section">
+        <div class="section-title">Tokens</div>
+        <table><thead><tr><th>Prefix</th><th>Server</th><th>Label</th><th>Expires</th><th>Status</th><th></th></tr></thead><tbody id="tokensBody"></tbody></table>
+        <div id="tokensEmpty" class="empty">No tokens yet.</div>
+      </div>
+    </div>
+
+    <!-- AUDIT -->
+    <div class="panel" id="panel-audit">
+      <div class="section">
+        <div class="section-title">Recent reads <button class="btn-secondary btn-sm" id="refreshAuditBtn" style="float:right">Refresh</button></div>
+        <table><thead><tr><th>When</th><th>Server</th><th>Domain</th><th>Status</th><th>IP</th></tr></thead><tbody id="auditBody"></tbody></table>
+        <div id="auditEmpty" class="empty">No reads yet.</div>
+      </div>
     </div>
   </div>
-
-  <script src="vault-settings.js"></script>
+  <script type="module" src="vault-settings.js"></script>
 </body>
 </html>

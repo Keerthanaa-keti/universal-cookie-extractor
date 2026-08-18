@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Universal Cookie Extractor",
-  "version": "2.1.1",
-  "description": "Auto-extracts cookies from all sites with encrypted cloud sync via Cookie Vault",
+  "version": "3.0.0",
+  "description": "Auto-extracts cookies with zero-knowledge, per-server scoped cloud access via Cookie Vault v3",
   "permissions": [
     "cookies",
     "storage",
@@ -15,7 +15,8 @@
     "https://*/*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "content_scripts": [
     {
