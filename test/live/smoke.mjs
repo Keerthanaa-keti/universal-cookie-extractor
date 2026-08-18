@@ -50,18 +50,18 @@ console.log(`\nLive smoke test — project ${REF} (${URL})\n`);
 const owner = await ensureOwner();
 check('owner user exists + can sign in', !!owner.id);
 
-// 2. register the Kiket server key (as the extension would)
+// 2. register a smoke server key (as the extension would)
 const kiketDir = join(homedir(), '.cookie-vault');
 mkdirSync(kiketDir, { recursive: true });
 const kp = await V.generateServerKeypair();
-const keyFile = join(kiketDir, 'kiket-ec2.key');
-writeFileSync(keyFile, JSON.stringify({ label: 'kiket-ec2', public_key: kp.publicKey, private_key: kp.privateKey }, null, 2));
+const keyFile = join(kiketDir, 'smoke-test.key');
+writeFileSync(keyFile, JSON.stringify({ label: 'smoke-test', public_key: kp.publicKey, private_key: kp.privateKey }, null, 2));
 chmodSync(keyFile, 0o600);
 // clean any prior smoke rows for idempotency
-await rest('DELETE', `server_keys?user_id=eq.${owner.id}&label=eq.kiket-ec2`).catch(() => {});
-const sk = await rest('POST', 'server_keys', { user_id: owner.id, label: 'kiket-ec2', public_key: kp.publicKey, allowed_domains: ['linkedin.com', 'higgsfield.ai'] });
+await rest('DELETE', `server_keys?user_id=eq.${owner.id}&label=eq.smoke-test`).catch(() => {});
+const sk = await rest('POST', 'server_keys', { user_id: owner.id, label: 'smoke-test', public_key: kp.publicKey, allowed_domains: ['linkedin.com', 'higgsfield.ai'] });
 const serverKeyId = sk[0].id;
-check('Kiket server registered (scope linkedin.com, higgsfield.ai)', !!serverKeyId);
+check('smoke server registered (scope linkedin.com, higgsfield.ai)', !!serverKeyId);
 
 // 3. WRITER: real VaultSync seeds a linkedin cookie sealed to owner + Kiket
 const writer = new VaultSync();
@@ -72,16 +72,16 @@ const wr = await writer.syncToVault({ '.linkedin.com': SAMPLE }, {
 });
 check('writer synced to real Supabase (1 domain, 1 server)', wr.synced && wr.domains === 1 && wr.servers >= 1);
 
-// 4. issue a token for Kiket
+// 4. issue a smoke token
 const token = 'cvk_' + V.b64url(crypto.getRandomValues(new Uint8Array(32)));
-await rest('POST', 'access_tokens', { user_id: owner.id, server_key_id: serverKeyId, token_hash: sha(token), token_prefix: token.slice(0, 12), label: 'kiket-ec2' });
-writeFileSync(join(homedir(), '.cookie-vault-kiket-token'), token); chmodSync(join(homedir(), '.cookie-vault-kiket-token'), 0o600);
-check('token issued for Kiket', true);
+await rest('POST', 'access_tokens', { user_id: owner.id, server_key_id: serverKeyId, token_hash: sha(token), token_prefix: token.slice(0, 12), label: 'smoke-test' });
+writeFileSync(join(homedir(), '.cookie-vault-smoke-token'), token); chmodSync(join(homedir(), '.cookie-vault-smoke-token'), 0o600);
+check('smoke token issued', true);
 
 // 5. READER: real client via the DEPLOYED broker
 const vault = new CookieVault({ brokerUrl: BROKER, token, keyFile });
 const got = await vault.getCookies('linkedin.com');
-check('Kiket reader decrypts linkedin cookie via LIVE broker', JSON.stringify(got) === JSON.stringify(SAMPLE));
+check('smoke reader decrypts linkedin cookie via LIVE broker', JSON.stringify(got) === JSON.stringify(SAMPLE));
 
 // 6. scope: bank.com must be denied
 const denied = await fetch(`${BROKER}/cookies?domain=bank.com`, { headers: { Authorization: `Bearer ${token}` } });
@@ -94,6 +94,6 @@ check('read recorded in live access_log', Array.isArray(log) && log.some((l) => 
 console.log(`\n${FAIL === 0 ? 'LIVE SMOKE PASSED' : 'LIVE SMOKE FAILURES: ' + FAIL} (${PASS} passed)`);
 console.log(`\nProject URL : ${URL}`);
 console.log(`Broker URL  : ${BROKER}`);
-console.log(`Kiket key   : ${keyFile}`);
-console.log(`Kiket token : ~/.cookie-vault-kiket-token`);
+console.log(`Smoke key   : ${keyFile}`);
+console.log(`Smoke token : ~/.cookie-vault-smoke-token`);
 process.exit(FAIL === 0 ? 0 : 1);
