@@ -171,12 +171,23 @@ def _main():
     sub.add_parser("domains", help="list domains this server may read")
     args = ap.parse_args()
 
-    if args.cmd == "keygen":
-        keygen(args.label)
-    elif args.cmd == "get":
-        print(json.dumps(CookieVault(label=args.label).get_cookies(args.domain), indent=2))
-    elif args.cmd == "domains":
-        print(json.dumps(CookieVault().list_domains(), indent=2))
+    try:
+        if args.cmd == "keygen":
+            keygen(args.label)
+        elif args.cmd == "get":
+            print(json.dumps(CookieVault(label=args.label).get_cookies(args.domain), indent=2))
+        elif args.cmd == "domains":
+            print(json.dumps(CookieVault().list_domains(), indent=2))
+    except RuntimeError as e:
+        import sys
+        msg = str(e)
+        if " 403 " in msg:
+            print(f"denied: '{args.domain}' is not in this server's scope.", file=sys.stderr)
+        elif " 401 " in msg:
+            print("unauthorized: check COOKIE_VAULT_TOKEN (it may be revoked or wrong).", file=sys.stderr)
+        else:
+            print(msg, file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
