@@ -187,6 +187,13 @@ async function handleCookies(req: Request, ctx: AuthCtx, domain: string): Promis
   return json(body);
 }
 
+async function handleProfile(_req: Request, ctx: AuthCtx): Promise<Response> {
+  // The browser profile (UA + client hints + languages + timezone) is vault-wide
+  // and not secret. Any valid token for this owner may read it to mimic the browser.
+  const rows = await rest(`cookie_vaults?user_id=eq.${ctx.user_id}&select=browser_profile&limit=1`);
+  return json({ profile: rows[0]?.browser_profile ?? null, server: ctx.server_label });
+}
+
 async function handleDomains(_req: Request, ctx: AuthCtx): Promise<Response> {
   const rows = await rest(
     `cookie_entries?user_id=eq.${ctx.user_id}&select=domain,cookie_count,has_auth_cookies,synced_at`,
@@ -219,7 +226,8 @@ export async function handler(req: Request): Promise<Response> {
 
     if (action === "cookies") return await handleCookies(req, ctx, url.searchParams.get("domain") ?? "");
     if (action === "domains") return await handleDomains(req, ctx);
-    return json({ error: "not found", actions: ["cookies", "domains", "health"] }, 404);
+    if (action === "profile") return await handleProfile(req, ctx);
+    return json({ error: "not found", actions: ["cookies", "domains", "profile", "health"] }, 404);
   } catch (e) {
     return json({ error: "internal error", detail: String(e) }, 500);
   }

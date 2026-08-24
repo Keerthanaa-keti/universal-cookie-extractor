@@ -54,6 +54,7 @@ export class VaultSync {
       vault_refresh_token: '',
       vault_email: '',
       vault_password: '',   // transient: present only until first successful login
+      browser_profile: null,
     });
     const d = await vaultDefaults();
     return {
@@ -179,6 +180,15 @@ export class VaultSync {
       await assertCryptoSupport();
       await this.authenticate(settings);
       await this.ensureVault(settings);
+
+      // Sync the browser profile (UA + client hints + timezone) so servers can mimic this browser.
+      if (settings.browser_profile) {
+        try {
+          await this._rest(settings, 'PATCH', `cookie_vaults?id=eq.${this.vaultId}`,
+            { browser_profile: settings.browser_profile }, 'return=minimal');
+        } catch (_e) { /* non-fatal */ }
+      }
+
       const servers = await this.getServerKeys(settings);
       const domainsToSync = this.filterDomains(cookiesByDomain, settings);
       if (domainsToSync.length === 0) return { synced: true, domains: 0, cookies: 0, servers: servers.length };

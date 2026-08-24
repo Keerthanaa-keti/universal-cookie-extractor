@@ -44,6 +44,34 @@ chrome.storage.local.get('cookieData', (result) => {
   updateDOM(result.cookieData || null);
 });
 
+// Capture a browser profile (User-Agent + client hints + languages + timezone) so
+// remote servers can present the SAME identity as this browser. Not secret; the
+// background worker stores it and syncs it to the vault alongside cookies.
+async function captureBrowserProfile() {
+  try {
+    let hints = {};
+    const uad = navigator.userAgentData;
+    if (uad && uad.getHighEntropyValues) {
+      hints = await uad.getHighEntropyValues(
+        ['platform', 'platformVersion', 'architecture', 'bitness', 'model', 'uaFullVersion', 'fullVersionList', 'wow64']);
+    }
+    const langs = (navigator.languages && navigator.languages.length) ? navigator.languages : [navigator.language];
+    const accept_language = langs.map((l, i) => (i === 0 ? l : `${l};q=${Math.max(0.1, 1 - i * 0.1).toFixed(1)}`)).join(',');
+    const profile = {
+      user_agent: navigator.userAgent,
+      languages: [...langs],
+      accept_language,
+      platform: navigator.platform,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || null,
+      screen: { width: screen.width, height: screen.height, dpr: window.devicePixelRatio },
+      ua_data: uad ? { brands: uad.brands, mobile: uad.mobile, platform: uad.platform, ...hints } : null,
+      captured_at: new Date().toISOString(),
+    };
+    chrome.runtime.sendMessage({ type: 'CAPTURE_BROWSER_PROFILE', profile });
+  } catch (e) { /* non-fatal */ }
+}
+captureBrowserProfile();
+
 // Auto-update when storage changes
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName === 'local' && changes.cookieData) {

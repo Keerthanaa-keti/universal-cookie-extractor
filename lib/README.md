@@ -55,6 +55,38 @@ await vault.loadIntoPuppeteer(page, 'linkedin.com');
 const ctx = await vault.playwrightContext(browser, 'linkedin.com');
 ```
 
+## Look like the real browser (not just cookies)
+
+Cookies alone are often not enough — sites also fingerprint the client (User-Agent,
+client hints, TLS/JA3). The extension captures a **browser profile** (UA + client
+hints + language + timezone) into the vault. The clients replay it:
+
+```python
+vault.get_profile()                       # {'user_agent': 'Mozilla/5.0…Chrome/151…', …}
+vault.browser_headers("linkedin.com")      # profile headers + Cookie header
+session = vault.impersonate_session("linkedin.com")   # curl_cffi: Chrome TLS(JA3) + UA + cookies
+r = session.get("https://www.linkedin.com/…")          # looks like your Chrome, at TLS + header level
+```
+
+- `requests_session()` sets the browser headers but uses OpenSSL TLS (fine for soft sites).
+- `impersonate_session()` (needs `curl_cffi`) matches **Chrome's JA3/JA4** too — use it for
+  strong anti-bot sites. Pin a target with `COOKIE_VAULT_IMPERSONATE=chrome131` if needed.
+- Playwright/Puppeteer contexts also get the UA, locale, and timezone from the profile.
+
+### Test that a session actually works
+```bash
+# fetch a URL as the browser+session; PASS if it looks logged in (`contains` present only when authed)
+python -m cookie_vault verify linkedin.com https://www.linkedin.com/feed/ --contains '"plainId"'
+python -m cookie_vault profile         # show the captured browser profile
+```
+Verified live on 2026-08-24: on the Kiket EC2 box, the stealth session presents a real
+Chrome JA3 + the captured UA (not the `python-requests` bot signature). See
+`test/live/fingerprint_test.py`.
+
+> **For claude.ai / OpenAI and other AI services, prefer their official APIs** (Anthropic
+> API, OpenAI API). Driving the web apps via session cookies + TLS impersonation is fragile
+> and against those services' terms; the APIs are stable and need none of this.
+
 ## Notes
 - `get_cookies(domain, max_age_seconds=N)` rejects entries synced longer than N seconds ago.
 - Every read is logged in the vault's `access_log` (owner sees it in the extension Audit tab).

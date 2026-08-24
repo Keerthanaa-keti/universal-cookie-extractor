@@ -20,12 +20,13 @@
 -- 1. Vaults — one per user; holds the owner-wrap KDF salt
 -- ---------------------------------------------------------------------------
 create table if not exists public.cookie_vaults (
-  id          uuid primary key default gen_random_uuid(),
-  user_id     uuid not null references auth.users(id) on delete cascade,
-  vault_name  text not null default 'default',
-  owner_salt  text not null,                       -- base64; PBKDF2 salt for owner-wrap KEK
-  created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now(),
+  id              uuid primary key default gen_random_uuid(),
+  user_id         uuid not null references auth.users(id) on delete cascade,
+  vault_name      text not null default 'default',
+  owner_salt      text not null,                   -- base64; PBKDF2 salt for owner-wrap KEK
+  browser_profile jsonb,                           -- UA + client hints + languages + timezone (not secret)
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now(),
   unique (user_id, vault_name)
 );
 create index if not exists idx_cookie_vaults_user on public.cookie_vaults(user_id);

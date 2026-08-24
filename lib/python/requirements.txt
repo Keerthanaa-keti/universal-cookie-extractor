@@ -1,2 +1,6 @@
 cryptography>=41.0.0
 requests>=2.28.0
+
+# Optional — full-stealth TLS impersonation so raw HTTP matches Chrome's JA3.
+# Needed for strong anti-bot sites; enables vault.impersonate_session() / verify_session().
+curl_cffi>=0.7.0

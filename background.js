@@ -89,6 +89,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     case 'GET_VAULT_STATUS':
       vaultSync.getStatus().then((status) => sendResponse(status));
       return true;
+    case 'CAPTURE_BROWSER_PROFILE':
+      if (message.profile) chrome.storage.local.set({ browser_profile: message.profile });
+      return false;
     default:
       return false;
   }

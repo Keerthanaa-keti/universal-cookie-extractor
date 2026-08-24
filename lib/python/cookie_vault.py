@@ -63,6 +63,28 @@ def _load_key(private_key: Optional[str], key_file: Optional[str], label: Option
     return data["public_key"], data["private_key"]
 
 
+def _headers_from_profile(profile: Optional[dict]) -> dict:
+    """Build the HTTP headers a real Chrome would send, from a captured browser profile."""
+    if not profile:
+        return {}
+    h = {}
+    if profile.get("user_agent"):
+        h["User-Agent"] = profile["user_agent"]
+    if profile.get("accept_language"):
+        h["Accept-Language"] = profile["accept_language"]
+    uad = profile.get("ua_data") or {}
+    brands = uad.get("brands")
+    if brands:
+        h["sec-ch-ua"] = ", ".join(f'"{b["brand"]}";v="{b["version"]}"' for b in brands)
+        h["sec-ch-ua-mobile"] = "?1" if uad.get("mobile") else "?0"
+        if uad.get("platform"):
+            h["sec-ch-ua-platform"] = f'"{uad["platform"]}"'
+    fvl = uad.get("fullVersionList")
+    if fvl:
+        h["sec-ch-ua-full-version-list"] = ", ".join(f'"{b["brand"]}";v="{b["version"]}"' for b in fvl)
+    return h
+
+
 class CookieVault:
     def __init__(
         self,
@@ -79,6 +101,7 @@ class CookieVault:
         self.public_key, self.private_key = _load_key(
             private_key or os.environ.get("COOKIE_VAULT_PRIVATE_KEY"), key_file, label
         )
+        self._profile = None
 
     def _get(self, path: str, params: dict) -> dict:
         r = _requests.get(
@@ -114,15 +137,73 @@ class CookieVault:
             return {}
         return {"Cookie": "; ".join(f"{c['name']}={c['value']}" for c in cookies)}
 
+    def get_profile(self) -> dict:
+        """Fetch the captured browser profile (User-Agent, client hints, languages, timezone)."""
+        if self._profile is None:
+            try:
+                self._profile = self._get("profile", {}).get("profile") or {}
+            except Exception:
+                self._profile = {}
+        return self._profile
+
+    def browser_headers(self, domain: str, max_age_seconds: Optional[int] = None) -> dict:
+        """Headers a real Chrome would send for this site: profile headers + the Cookie header."""
+        h = dict(_headers_from_profile(self.get_profile()))
+        h.update(self.cookie_header(domain, max_age_seconds))
+        return h
+
     def requests_session(self, domain: str, max_age_seconds: Optional[int] = None) -> "_requests.Session":
+        """A requests.Session with cookies + the browser's headers (UA + client hints).
+        NOTE: this still uses OpenSSL TLS. For strong anti-bot sites use impersonate_session()."""
         session = _requests.Session()
         for c in self.get_cookies(domain, max_age_seconds):
             session.cookies.set(c["name"], c["value"], domain=c.get("domain", domain), path=c.get("path", "/"))
+        session.headers.update(_headers_from_profile(self.get_profile()))
         return session
+
+    def impersonate_session(self, domain: str, impersonate: Optional[str] = None, max_age_seconds: Optional[int] = None):
+        """Full stealth: a curl_cffi session that matches Chrome's TLS (JA3/JA4) AND sets the
+        captured User-Agent + client hints + cookies. Indistinguishable from the real browser.
+        `impersonate` picks the browser target (default env COOKIE_VAULT_IMPERSONATE or "chrome" =
+        latest). Requires: pip install curl_cffi"""
+        try:
+            from curl_cffi import requests as _cffi
+        except ImportError as e:
+            raise RuntimeError("Install curl_cffi for full-stealth TLS impersonation: pip install curl_cffi") from e
+        target = impersonate or os.environ.get("COOKIE_VAULT_IMPERSONATE", "chrome")
+        session = _cffi.Session(impersonate=target)
+        for c in self.get_cookies(domain, max_age_seconds):
+            session.cookies.set(c["name"], c["value"], domain=c.get("domain", domain), path=c.get("path", "/"))
+        session.headers.update(_headers_from_profile(self.get_profile()))
+        return session
+
+    def verify_session(self, domain: str, url: str, contains: Optional[str] = None,
+                       impersonate: bool = True) -> dict:
+        """Test that this session actually works on the server: fetch `url` as the browser and
+        report whether it looks logged in. `contains` = a string present only when authenticated.
+        Returns {ok, status, final_url, matched, bytes}."""
+        session = self.impersonate_session(domain) if impersonate else self.requests_session(domain)
+        r = session.get(url, allow_redirects=True)
+        text = getattr(r, "text", "") or ""
+        ok = 200 <= r.status_code < 400
+        matched = (contains in text) if contains is not None else None
+        if contains is not None:
+            ok = ok and bool(matched)
+        return {"ok": ok, "status": r.status_code, "final_url": str(getattr(r, "url", url)),
+                "matched": matched, "bytes": len(text)}
 
     async def playwright_context(self, browser, domain: str, max_age_seconds: Optional[int] = None):
         cookies = self.get_cookies(domain, max_age_seconds)
-        context = await browser.new_context()
+        # Match the real browser: user agent, locale, and timezone from the captured profile.
+        p = self.get_profile() or {}
+        opts = {}
+        if p.get("user_agent"):
+            opts["user_agent"] = p["user_agent"]
+        if p.get("languages"):
+            opts["locale"] = p["languages"][0]
+        if p.get("timezone"):
+            opts["timezone_id"] = p["timezone"]
+        context = await browser.new_context(**opts)
         pw = []
         for c in cookies:
             ck = {"name": c["name"], "value": c["value"],
@@ -169,6 +250,13 @@ def _main():
     g.add_argument("domain")
     g.add_argument("--label")
     sub.add_parser("domains", help="list domains this server may read")
+    sub.add_parser("profile", help="show the captured browser profile")
+    v = sub.add_parser("verify", help="test that a session works on a URL")
+    v.add_argument("domain")
+    v.add_argument("url")
+    v.add_argument("--contains", help="text present only when logged in")
+    v.add_argument("--label")
+    v.add_argument("--no-impersonate", action="store_true", help="use plain requests instead of TLS impersonation")
     args = ap.parse_args()
 
     try:
@@ -178,11 +266,20 @@ def _main():
             print(json.dumps(CookieVault(label=args.label).get_cookies(args.domain), indent=2))
         elif args.cmd == "domains":
             print(json.dumps(CookieVault().list_domains(), indent=2))
+        elif args.cmd == "profile":
+            print(json.dumps(CookieVault().get_profile(), indent=2))
+        elif args.cmd == "verify":
+            import sys
+            r = CookieVault(label=args.label).verify_session(
+                args.domain, args.url, contains=args.contains, impersonate=not args.no_impersonate)
+            print(json.dumps(r, indent=2))
+            sys.exit(0 if r["ok"] else 1)
     except RuntimeError as e:
         import sys
         msg = str(e)
+        dom = getattr(args, "domain", "")
         if " 403 " in msg:
-            print(f"denied: '{args.domain}' is not in this server's scope.", file=sys.stderr)
+            print(f"denied: '{dom}' is not in this server's scope.", file=sys.stderr)
         elif " 401 " in msg:
             print("unauthorized: check COOKIE_VAULT_TOKEN (it may be revoked or wrong).", file=sys.stderr)
         else:
